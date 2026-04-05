@@ -27,7 +27,7 @@ Firecracker is developed and maintained by Amazon Web Services under the Apache 
 | Jailer documentation | [jailer.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/jailer.md) |
 | Snapshotting | [snapshotting.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/snapshotting/versioning.md) |
 
-## What it does
+## What firecracker-farm does
 
 - Provisions Firecracker and jailer binaries on a Proxmox host
 - Builds a reusable Ubuntu 24.04 cloud image template (bare ext4 rootfs)
