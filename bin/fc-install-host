@@ -1,0 +1,507 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=../lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+fc_load_config
+
+readonly FC_FIRECRACKER_REPO="firecracker-microvm/firecracker"
+readonly FC_DEFAULT_FIRECRACKER_VERSION="latest"
+readonly FC_FIRECRACKER_CI_KERNEL_BUCKET="https://s3.amazonaws.com/spec.ccfc.min"
+readonly FC_REQUIRED_PACKAGES=(
+  curl
+  jq
+  qemu-utils
+  e2fsprogs
+)
+
+readonly FC_OPTIONAL_PACKAGES=(
+  libguestfs-tools
+)
+
+fc_package_requirement_satisfied() {
+  local package_name=$1
+
+  case "$package_name" in
+    qemu-utils)
+      fc_command_exists qemu-img || fc_package_installed "$package_name"
+      ;;
+    libguestfs-tools)
+      fc_command_exists virt-customize || fc_package_installed "$package_name"
+      ;;
+    *)
+      fc_package_installed "$package_name"
+      ;;
+  esac
+}
+
+fc_install_host_usage() {
+  cat <<EOF
+Usage: fc-install-host [--preflight|--install] [--guest-user USER] [--ssh-key-file PATH]
+
+Without arguments, fc-install-host performs the install steps.
+
+Modes:
+  --preflight  Run read-only host checks only
+  --install    Install missing host packages and Firecracker binaries
+  -h, --help   Show this help text
+
+Options:
+  --guest-user USER      Username for the VM guest (default: operator username)
+  --ssh-key-file PATH    SSH public key file to embed (default: ~/.ssh/authorized_keys)
+
+Environment:
+  FC_FIRECRACKER_VERSION  Release tag to install (default: latest)
+EOF
+}
+
+fc_has_bridge() {
+  local bridge_name=$1
+
+  if fc_command_exists ip; then
+    ip link show "$bridge_name" >/dev/null 2>&1
+    return $?
+  fi
+
+  [[ -d "/sys/class/net/$bridge_name/bridge" ]]
+}
+
+fc_has_free_space() {
+  local path=$1
+  local required_mib=$2
+  local available_mib
+
+  available_mib=$(df -Pm "$path" 2>/dev/null | awk 'NR == 2 { print $4 }') || return 1
+  [[ -n "$available_mib" ]] || return 1
+  [[ "$available_mib" =~ ^[0-9]+$ ]] || return 1
+  (( available_mib >= required_mib ))
+}
+
+fc_check_free_space() {
+  local path=$1
+  local required_mib=$2
+  local available_mib
+
+  available_mib=$(df -Pm "$path" 2>/dev/null | awk 'NR == 2 { print $4 }') || {
+    fc_error "unable to determine free space for $path"
+    return 1
+  }
+
+  [[ -n "$available_mib" && "$available_mib" =~ ^[0-9]+$ ]] || {
+    fc_error "unable to determine free space for $path"
+    return 1
+  }
+
+  if (( available_mib >= required_mib )); then
+    fc_ok "$path has ${available_mib} MiB free (required: ${required_mib} MiB)"
+    return 0
+  fi
+
+  fc_error "$path has ${available_mib} MiB free (required: ${required_mib} MiB)"
+  return 1
+}
+
+fc_check_sudo_access() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    fc_ok "running with root privileges"
+    return 0
+  fi
+
+  if fc_command_exists sudo && sudo -n true >/dev/null 2>&1; then
+    fc_ok "passwordless sudo access is available"
+    return 0
+  fi
+
+  fc_error "root or passwordless sudo access is required for host installation"
+  return 1
+}
+
+fc_sudo() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+    return $?
+  fi
+
+  sudo -n "$@"
+}
+
+fc_package_installed() {
+  local package_name=$1
+
+  if ! fc_command_exists dpkg; then
+    return 1
+  fi
+
+  dpkg -s "$package_name" >/dev/null 2>&1
+}
+
+fc_missing_packages() {
+  local package_name
+
+  for package_name in "${FC_REQUIRED_PACKAGES[@]}"; do
+    if ! fc_package_requirement_satisfied "$package_name"; then
+      printf '%s\n' "$package_name"
+    fi
+  done
+}
+
+fc_missing_optional_packages() {
+  local package_name
+
+  for package_name in "${FC_OPTIONAL_PACKAGES[@]}"; do
+    if ! fc_package_requirement_satisfied "$package_name"; then
+      printf '%s\n' "$package_name"
+    fi
+  done
+}
+
+fc_require_install_command() {
+  local description=$1
+  local command_name=$2
+
+  fc_check_required "$description" fc_command_exists "$command_name"
+}
+
+fc_detect_firecracker_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64)
+      printf 'x86_64\n'
+      ;;
+    aarch64|arm64)
+      printf 'aarch64\n'
+      ;;
+    *)
+      fc_error "unsupported host architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+}
+
+fc_firecracker_kernel_target_path() {
+  printf '%s/vmlinux.bin\n' "$FC_BINARY_ROOT"
+}
+
+fc_resolve_firecracker_version() {
+  local requested_version=${FC_FIRECRACKER_VERSION:-$FC_DEFAULT_FIRECRACKER_VERSION}
+  local resolved_version
+
+  if [[ "$requested_version" == "latest" ]]; then
+    fc_info "Resolving latest Firecracker release from GitHub" >&2
+    resolved_version=$(curl -fsSL "https://api.github.com/repos/${FC_FIRECRACKER_REPO}/releases/latest" | jq -er '.tag_name') || {
+      fc_error "unable to resolve latest Firecracker release"
+      return 1
+    }
+  else
+    resolved_version=$requested_version
+  fi
+
+  if [[ "$resolved_version" != v* ]]; then
+    resolved_version="v${resolved_version}"
+  fi
+
+  printf '%s\n' "$resolved_version"
+}
+
+fc_install_missing_packages() {
+  local missing_packages=()
+  local optional_packages=()
+  local package_name
+
+  while IFS= read -r package_name; do
+    [[ -n "$package_name" ]] && missing_packages+=("$package_name")
+  done < <(fc_missing_packages)
+
+  while IFS= read -r package_name; do
+    [[ -n "$package_name" ]] && optional_packages+=("$package_name")
+  done < <(fc_missing_optional_packages)
+
+  if [[ ${#missing_packages[@]} -eq 0 ]]; then
+    fc_ok "Required host packages are already installed"
+  else
+    fc_info "Installing missing host packages: ${missing_packages[*]}"
+    fc_sudo apt-get update
+    fc_sudo apt-get install -y --no-install-recommends "${missing_packages[@]}"
+    hash -r
+    fc_ok "Installed missing host packages"
+  fi
+
+  if [[ ${#optional_packages[@]} -eq 0 ]]; then
+    fc_ok "Optional host packages are already installed"
+    return 0
+  fi
+
+  fc_warn "Skipping optional host packages unless explicitly installed: ${optional_packages[*]}"
+}
+
+fc_ensure_directories() {
+  fc_info "Ensuring dedicated Firecracker directories exist"
+  fc_sudo install -d -m 0755 "$FC_RUNTIME_ROOT"
+  fc_sudo install -d -m 0755 "$FC_LOG_ROOT"
+  fc_sudo install -d -m 0755 "$FC_BINARY_ROOT"
+  fc_ok "Dedicated Firecracker directories are present"
+}
+
+fc_install_firecracker_binaries() {
+  local version=$1
+  local arch=$2
+  local download_root="https://github.com/${FC_FIRECRACKER_REPO}/releases/download/${version}"
+  local archive_name="firecracker-${version}-${arch}.tgz"
+  local checksum_name="${archive_name}.sha256.txt"
+  local tmpdir
+  local release_dir
+  local firecracker_source
+  local jailer_source
+
+  tmpdir=$(mktemp -d)
+
+  fc_info "Downloading Firecracker ${version} for ${arch} into ${tmpdir}"
+
+  if ! curl -fL --retry 3 --retry-delay 1 -o "$tmpdir/$archive_name" "$download_root/$archive_name"; then
+    fc_error "download failed; preserving ${tmpdir} for debugging"
+    return 1
+  fi
+
+  if ! curl -fL --retry 3 --retry-delay 1 -o "$tmpdir/$checksum_name" "$download_root/$checksum_name"; then
+    fc_error "checksum download failed; preserving ${tmpdir} for debugging"
+    return 1
+  fi
+
+  if ! (cd "$tmpdir" && sha256sum -c "$checksum_name"); then
+    fc_error "checksum validation failed; preserving ${tmpdir} for debugging"
+    return 1
+  fi
+
+  tar -xzf "$tmpdir/$archive_name" -C "$tmpdir"
+  release_dir="$tmpdir/release-${version}-${arch}"
+  firecracker_source="$release_dir/firecracker-${version}-${arch}"
+  jailer_source="$release_dir/jailer-${version}-${arch}"
+
+  [[ -x "$firecracker_source" ]] || {
+    fc_error "Firecracker binary missing from extracted release; preserving ${tmpdir}"
+    return 1
+  }
+
+  [[ -x "$jailer_source" ]] || {
+    fc_error "jailer binary missing from extracted release; preserving ${tmpdir}"
+    return 1
+  }
+
+  fc_info "Installing official Firecracker release binaries into ${FC_BINARY_ROOT}"
+  fc_sudo install -m 0755 "$firecracker_source" "$FC_BINARY_ROOT/firecracker"
+  fc_sudo install -m 0755 "$jailer_source" "$FC_BINARY_ROOT/jailer"
+  rm -rf "$tmpdir"
+  fc_ok "Installed Firecracker ${version} release binaries"
+}
+
+fc_firecracker_ci_version() {
+  local version=$1
+
+  version=${version#v}
+  printf 'v%s\n' "${version%.*}"
+}
+
+fc_resolve_guest_kernel_url() {
+  local version=$1
+  local arch=$2
+  local ci_version kernel_list_url kernel_key
+
+  if [[ -n "${FC_KERNEL_IMAGE_URL:-}" ]]; then
+    printf '%s\n' "$FC_KERNEL_IMAGE_URL"
+    return 0
+  fi
+
+  ci_version=$(fc_firecracker_ci_version "$version") || return 1
+  kernel_list_url="${FC_FIRECRACKER_CI_KERNEL_BUCKET}/?prefix=firecracker-ci/${ci_version}/${arch}/vmlinux-&list-type=2"
+  kernel_key=$(curl -fsSL "$kernel_list_url" | grep -oE "firecracker-ci/${ci_version}/${arch}/vmlinux-[0-9]+\.[0-9]+\.[0-9]+" | sort -V | tail -1) || {
+    fc_error "unable to resolve guest kernel for ${ci_version}/${arch}"
+    return 1
+  }
+
+  [[ -n "$kernel_key" ]] || {
+    fc_error "unable to resolve guest kernel for ${ci_version}/${arch}"
+    return 1
+  }
+
+  printf '%s/%s\n' "$FC_FIRECRACKER_CI_KERNEL_BUCKET" "$kernel_key"
+}
+
+fc_install_guest_kernel() {
+  local version=$1
+  local arch=$2
+  local kernel_url target_path tmpdir staged_kernel
+
+  kernel_url=$(fc_resolve_guest_kernel_url "$version" "$arch") || return 1
+  target_path=$(fc_firecracker_kernel_target_path)
+  tmpdir=$(mktemp -d)
+  staged_kernel="$tmpdir/vmlinux.bin"
+
+  fc_info "Downloading guest kernel from ${kernel_url}"
+  if ! curl -fL --retry 3 --retry-delay 1 -o "$staged_kernel" "$kernel_url"; then
+    fc_error "guest kernel download failed; preserving ${tmpdir} for debugging"
+    return 1
+  fi
+
+  fc_sudo install -m 0644 "$staged_kernel" "$target_path"
+  rm -rf "$tmpdir"
+  fc_ok "Installed guest kernel to ${target_path}"
+}
+
+fc_run_preflight() {
+  local failures=0
+  local runtime_parent
+  local package_name
+
+  runtime_parent=$(dirname "$FC_RUNTIME_ROOT")
+
+  fc_info "Running read-only host preflight checks"
+  fc_info "This mode inspects the current machine only and does not install anything"
+
+  fc_check_required "/dev/kvm is present" test -e /dev/kvm || ((failures += 1))
+  fc_check_required "bridge ${FC_DEFAULT_BRIDGE} is present" fc_has_bridge "$FC_DEFAULT_BRIDGE" || ((failures += 1))
+  fc_check_required "qemu-img is available" fc_command_exists qemu-img || ((failures += 1))
+  fc_check_required "systemctl is available" fc_command_exists systemctl || ((failures += 1))
+
+  fc_check_free_space "$runtime_parent" "$FC_PREFLIGHT_MIN_FREE_MIB" || ((failures += 1))
+  fc_check_sudo_access || ((failures += 1))
+
+  for package_name in "${FC_REQUIRED_PACKAGES[@]}"; do
+    fc_check_required "package ${package_name} is installed" fc_package_requirement_satisfied "$package_name" || ((failures += 1))
+  done
+
+  for package_name in "${FC_OPTIONAL_PACKAGES[@]}"; do
+    fc_check_optional "package ${package_name} is installed" fc_package_requirement_satisfied "$package_name"
+  done
+
+  if (( failures > 0 )); then
+    fc_error "Preflight failed with ${failures} required check(s) failing"
+    return 1
+  fi
+
+  fc_ok "Preflight passed"
+}
+
+fc_run_install() {
+  local version
+  local arch
+
+  fc_info "Installing Firecracker host prerequisites"
+  fc_info "This only installs packages, dedicated directories, and release binaries"
+  fc_info "Existing Proxmox VM configuration is not modified"
+
+  fc_check_sudo_access
+  fc_require_install_command "dpkg is available" dpkg
+  fc_require_install_command "apt-get is available" apt-get
+  fc_require_install_command "install is available" install
+  fc_require_install_command "mktemp is available" mktemp
+  fc_require_install_command "tar is available" tar
+  fc_require_install_command "sha256sum is available" sha256sum
+
+  fc_install_missing_packages
+  fc_ensure_directories
+
+  version=$(fc_resolve_firecracker_version)
+  arch=$(fc_detect_firecracker_arch)
+  fc_install_firecracker_binaries "$version" "$arch"
+  fc_install_guest_kernel "$version" "$arch"
+
+  fc_ok "Host installer completed"
+  fc_info "Run bin/fc-install-host --preflight to re-check host readiness"
+}
+
+fc_detect_operator_user() {
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    printf '%s\n' "$SUDO_USER"
+    return 0
+  fi
+  whoami
+}
+
+fc_detect_operator_home() {
+  local user=$1
+  if [[ "$user" == "root" ]]; then
+    printf '%s\n' "${HOME:-/root}"
+    return 0
+  fi
+  printf '/home/%s\n' "$user"
+}
+
+fc_detect_ssh_key_file() {
+  local operator_user
+  operator_user=$(fc_detect_operator_user)
+  printf '%s/.ssh/authorized_keys\n' "$(fc_detect_operator_home "$operator_user")"
+}
+
+fc_write_host_env() {
+  local guest_user=$1
+  local ssh_key_file=$2
+  local host_env_path="${FC_RUNTIME_ROOT}/host.env"
+
+  cat > "$host_env_path" <<EOF
+# Written by fc-install-host on $(date -u +%Y-%m-%dT%H:%M:%SZ)
+FC_GUEST_USER=$guest_user
+FC_SSH_KEY_FILE=$ssh_key_file
+EOF
+  fc_ok "Wrote host configuration to $host_env_path"
+}
+
+main() {
+  local mode=install
+  local guest_user=
+  local ssh_key_file=
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --preflight)
+        mode=preflight
+        shift
+        ;;
+      --install)
+        mode=install
+        shift
+        ;;
+      --guest-user)
+        [[ $# -ge 2 ]] || { fc_error "--guest-user requires a value"; return 1; }
+        guest_user=$2
+        shift 2
+        ;;
+      --ssh-key-file)
+        [[ $# -ge 2 ]] || { fc_error "--ssh-key-file requires a value"; return 1; }
+        ssh_key_file=$2
+        shift 2
+        ;;
+      -h|--help)
+        fc_install_host_usage
+        return 0
+        ;;
+      *)
+        fc_error "Unknown argument: $1"
+        fc_install_host_usage
+        return 1
+        ;;
+    esac
+  done
+
+  case "$mode" in
+    preflight)
+      fc_run_preflight
+      ;;
+    install)
+      if [[ -z "$guest_user" ]]; then
+        guest_user=$(fc_detect_operator_user)
+      fi
+      if [[ -z "$ssh_key_file" ]]; then
+        ssh_key_file=$(fc_detect_ssh_key_file)
+      fi
+      if [[ ! -f "$ssh_key_file" ]]; then
+        fc_error "SSH key file not found: $ssh_key_file"
+        fc_error "Specify a valid path with --ssh-key-file"
+        return 1
+      fi
+      fc_run_install
+      fc_write_host_env "$guest_user" "$ssh_key_file"
+      ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=../lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+# shellcheck source=../lib/image.sh
+source "$SCRIPT_DIR/../lib/image.sh"
+# shellcheck source=../lib/network.sh
+source "$SCRIPT_DIR/../lib/network.sh"
+fc_load_config
+
+fc_create_usage() {
+  cat <<EOF
+Usage: fc-create <name> [--disk-size SIZE] [--vcpus N] [--memory SIZE]
+
+Creates a persistent per-instance rootfs clone and metadata only.
+
+Options:
+  --disk-size SIZE   Disk size (e.g. 20G, 512M). Prompted interactively if omitted.
+  --vcpus N          Number of vCPUs (integer >= 1, default: $FC_DEFAULT_VCPUS).
+  --memory SIZE      Memory allocation (e.g. 2048m, 2g). Minimum 128 MiB.
+                     Default: ${FC_DEFAULT_MEMORY_MIB}m.
+EOF
+}
+
+fc_create_main() {
+  local original_args=("$@")
+  local vm_name=
+  local disk_size=
+  local vcpus=
+  local memory=
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --disk-size)
+        if [[ $# -lt 2 ]]; then
+          fc_error "--disk-size requires a value"
+          return 1
+        fi
+        disk_size=$2
+        shift 2
+        ;;
+      --vcpus)
+        if [[ $# -lt 2 ]]; then
+          fc_error "--vcpus requires a value"
+          return 1
+        fi
+        vcpus=$2
+        shift 2
+        ;;
+      --memory)
+        if [[ $# -lt 2 ]]; then
+          fc_error "--memory requires a value"
+          return 1
+        fi
+        memory=$2
+        shift 2
+        ;;
+      -h|--help)
+        fc_create_usage
+        return 0
+        ;;
+      --*)
+        fc_error "Unknown argument: $1"
+        fc_create_usage >&2
+        return 1
+        ;;
+      *)
+        if [[ -n "$vm_name" ]]; then
+          fc_error "Usage: fc-create <name> [--disk-size SIZE] [--vcpus N] [--memory SIZE]"
+          return 1
+        fi
+        vm_name=$1
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$vm_name" ]]; then
+    fc_error "Usage: fc-create <name> [--disk-size SIZE] [--vcpus N] [--memory SIZE]"
+    return 1
+  fi
+
+  if [[ -z "$disk_size" ]]; then
+    if [[ -t 0 ]]; then
+      disk_size=$(fc_image_prompt_disk_size) || return 1
+    else
+      fc_error "--disk-size is required when stdin is not interactive"
+      return 1
+    fi
+  fi
+
+  # Validate and default vCPUs
+  if [[ -z "$vcpus" ]]; then
+    vcpus=$FC_DEFAULT_VCPUS
+  fi
+  if [[ ! "$vcpus" =~ ^[0-9]+$ ]] || (( vcpus < 1 )); then
+    fc_error "--vcpus must be a positive integer (got: $vcpus)"
+    return 1
+  fi
+
+  # Validate and default memory
+  local mem_size_mib
+  if [[ -z "$memory" ]]; then
+    mem_size_mib=$FC_DEFAULT_MEMORY_MIB
+  else
+    mem_size_mib=$(fc_size_to_mib "$memory") || return 1
+  fi
+  if (( mem_size_mib < 128 )); then
+    fc_error "--memory must be at least 128 MiB (got: ${mem_size_mib} MiB)"
+    return 1
+  fi
+
+  if ! fc_running_as_root; then
+    fc_reexec_with_sudo "$0" "${original_args[@]}"
+  fi
+
+  fc_image_create_instance_disk "$vm_name" "$disk_size" || return 1
+  fc_network_prepare_instance_metadata "$vm_name" "$(fc_image_instance_metadata_path "$vm_name")"
+
+  # Write per-instance compute parameters to vm.env
+  local metadata_path
+  metadata_path=$(fc_image_instance_metadata_path "$vm_name")
+  cat >> "$metadata_path" <<EOF
+VCPU_COUNT=$vcpus
+MEM_SIZE_MIB=$mem_size_mib
+EOF
+}
+
+fc_create_main "$@"

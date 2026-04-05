@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run all test suites
+        run: |
+          for t in tests/*.sh; do
+            echo "--- Running $t ---"
+            bash "$t" || exit 1
+          done
+
+  release:
+    name: Build and publish release
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: printf 'VERSION=%s\n' "${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release tarball
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ARCHIVE_DIR="firecracker-farm-${VERSION}"
+          mkdir -p "build/${ARCHIVE_DIR}"
+
+          # Include only runtime-relevant files
+          cp -r bin/ "build/${ARCHIVE_DIR}/bin/"
+          cp -r lib/ "build/${ARCHIVE_DIR}/lib/"
+          cp -r templates/ "build/${ARCHIVE_DIR}/templates/"
+          cp install.sh "build/${ARCHIVE_DIR}/"
+          cp README.md "build/${ARCHIVE_DIR}/"
+          cp -r docs/ "build/${ARCHIVE_DIR}/docs/"
+
+          # Remove plan docs if they leaked in
+          rm -rf "build/${ARCHIVE_DIR}/docs/plans/"
+
+          # Exclude test files, CI config, agent instructions
+          # (they are simply not copied above)
+
+          tar -czf "build/firecracker-farm-${VERSION}.tar.gz" \
+            -C build "${ARCHIVE_DIR}"
+
+          echo "TARBALL=build/firecracker-farm-${VERSION}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.TARBALL }}
+          generate_release_notes: true

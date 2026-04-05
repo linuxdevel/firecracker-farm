@@ -1,0 +1,3 @@
+instance-id: __FC_INSTANCE_ID__
+local-hostname: __FC_LOCAL_HOSTNAME__
+dsmode: local

@@ -1,0 +1,12 @@
+#cloud-config
+users:
+  - default
+  - name: __FC_GUEST_USER__
+    gecos: Firecracker Admin
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __FC_SSH_AUTHORIZED_KEY__
+ssh_pwauth: false
+disable_root: true

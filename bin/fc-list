@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=../lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+# shellcheck source=../lib/network.sh
+source "$SCRIPT_DIR/../lib/network.sh"
+# shellcheck source=../lib/firecracker.sh
+source "$SCRIPT_DIR/../lib/firecracker.sh"
+fc_load_config
+
+fc_list_usage() {
+  cat <<EOF
+Usage: fc-list
+
+List all Firecracker VM instances in a formatted table.
+
+Columns:
+  NAME      Instance name
+  STATUS    "running" or "stopped"
+  PID       Firecracker process ID ("-" when stopped)
+  VCPUS     Number of virtual CPUs
+  MEMORY    Memory allocation in MiB
+  DISK      Disk size
+  IP        Guest IP address ("-" if unknown)
+  TAP       Host tap device name
+  BRIDGE    Host bridge name
+  UPTIME    Time since process started ("-" when stopped)
+
+Options:
+  -h, --help   Show this help text
+EOF
+}
+
+fc_list_main() {
+  case "${1:-}" in
+    -h|--help)
+      fc_list_usage
+      return 0
+      ;;
+  esac
+
+  local instances_dir
+  instances_dir=$(fc_vm_instances_dir)
+
+  if [[ ! -d "$instances_dir" ]]; then
+    return 0
+  fi
+
+  # Print header
+  printf '%-12s %-8s %-7s %-5s %-8s %-5s %-15s %-15s %-8s %s\n' \
+      NAME STATUS PID VCPUS MEMORY DISK IP TAP BRIDGE UPTIME
+
+  local vm_name
+  for vm_name in "$instances_dir"/*/; do
+    vm_name=$(basename -- "$vm_name")
+    [[ -f "$instances_dir/$vm_name/vm.env" ]] || continue
+
+    local info_output
+    info_output=$(fc_firecracker_vm_info "$vm_name" 2>/dev/null) || continue
+
+    # Parse key=value pairs
+    local name="" status="" pid="" vcpus="" memory="" disk="" ip="" tap="" bridge="" uptime=""
+    local _key _value
+    while IFS='=' read -r _key _value; do
+      case "$_key" in
+        VM_NAME) name=$_value ;;
+        STATUS)  status=$_value ;;
+        PID)     pid=$_value ;;
+        VCPUS)   vcpus=$_value ;;
+        MEMORY)  memory=$_value ;;
+        DISK)    disk=$_value ;;
+        IP)      ip=$_value ;;
+        TAP)     tap=$_value ;;
+        BRIDGE)  bridge=$_value ;;
+        UPTIME)  uptime=$_value ;;
+      esac
+    done <<< "$info_output"
+
+    printf '%-12s %-8s %-7s %-5s %-8s %-5s %-15s %-15s %-8s %s\n' \
+        "$name" "$status" "$pid" "$vcpus" "${memory}M" "$disk" "$ip" "$tap" "$bridge" "$uptime"
+  done
+}
+
+fc_list_main "$@"

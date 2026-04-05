@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=../lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+# shellcheck source=../lib/firecracker.sh
+source "$SCRIPT_DIR/../lib/firecracker.sh"
+fc_load_config
+
+fc_start_usage() {
+  cat <<EOF
+Usage: fc-start [--direct] <name>
+
+Start a Firecracker VM instance.
+
+By default, installs a systemd template unit and enables the instance
+service. With --direct, launches the VM via jailer without systemd
+(used internally by the systemd ExecStart handler).
+
+Requires root. Re-execs through sudo when invoked by a non-root user.
+
+Options:
+  --direct     Launch the VM directly without systemd (used by ExecStart)
+  -h, --help   Show this help text
+
+Example:
+  fc-start myvm
+  fc-start --direct myvm
+EOF
+}
+
+fc_start_control_root() {
+  printf '%s/control\n' "$FC_RUNTIME_ROOT"
+}
+
+fc_start_systemd_system_dir() {
+  printf '%s\n' "${FC_SYSTEMD_SYSTEM_DIR:-/etc/systemd/system}"
+}
+
+fc_start_systemd_template_path() {
+  printf '%s/firecracker@.service\n' "$(fc_start_systemd_system_dir)"
+}
+
+fc_start_systemd_unit_name() {
+  local vm_name=$1
+  printf 'firecracker@%s.service\n' "$vm_name"
+}
+
+fc_start_render_systemd_unit() {
+  local template_path rendered control_root
+
+  template_path="$SCRIPT_DIR/../templates/firecracker-vm.service"
+  rendered=$(<"$template_path") || return 1
+  control_root=$(fc_start_control_root) || return 1
+  rendered=${rendered//"{{FC_CONTROL_ROOT}}"/$control_root}
+  rendered=${rendered//"{{FC_RUNTIME_ROOT}}"/$FC_RUNTIME_ROOT}
+  printf '%s\n' "$rendered"
+}
+
+fc_start_sync_control_files() {
+  local repo_root control_root
+
+  repo_root=$(fc_repo_root) || return 1
+  control_root=$(fc_start_control_root) || return 1
+
+  mkdir -p "$control_root/bin" "$control_root/lib" "$control_root/templates"
+  install -m 0755 "$repo_root/bin/fc-start" "$control_root/bin/fc-start"
+  install -m 0755 "$repo_root/bin/fc-stop" "$control_root/bin/fc-stop"
+  install -m 0644 "$repo_root/lib/common.sh" "$control_root/lib/common.sh"
+  install -m 0644 "$repo_root/lib/config.sh" "$control_root/lib/config.sh"
+  install -m 0644 "$repo_root/lib/firecracker.sh" "$control_root/lib/firecracker.sh"
+  install -m 0644 "$repo_root/lib/network.sh" "$control_root/lib/network.sh"
+  install -m 0644 "$repo_root/templates/vm-config.json.tmpl" "$control_root/templates/vm-config.json.tmpl"
+}
+
+fc_start_install_systemd_unit() {
+  local system_dir unit_path rendered
+
+  fc_command_exists systemctl || {
+    fc_error "systemctl is required to start VMs through systemd"
+    return 1
+  }
+
+  system_dir=$(fc_start_systemd_system_dir)
+  unit_path=$(fc_start_systemd_template_path)
+  fc_start_sync_control_files || return 1
+  rendered=$(fc_start_render_systemd_unit) || return 1
+
+  mkdir -p "$system_dir"
+  printf '%s\n' "$rendered" > "$unit_path"
+  systemctl daemon-reload
+}
+
+fc_start_main() {
+  local direct=0
+
+  case "${1:-}" in
+    -h|--help)
+      fc_start_usage
+      return 0
+      ;;
+  esac
+
+  if [[ "${1:-}" == '--direct' ]]; then
+    direct=1
+    shift
+  fi
+
+  fc_require_argument_count "$#" 1 "Usage: fc-start [--direct] <name>" || return 1
+
+  if (( ! direct )) && ! fc_running_as_root; then
+    fc_reexec_with_sudo "$0" "$@"
+  fi
+
+  if (( direct )); then
+    fc_firecracker_start "$1"
+    return 0
+  fi
+
+  fc_start_install_systemd_unit || return 1
+  systemctl enable --now "$(fc_start_systemd_unit_name "$1")"
+}
+
+fc_start_main "$@"
