@@ -176,6 +176,26 @@ Test suites:
 - No destructive delete/cleanup commands in v1
 - Input validation rejects invalid VM names, overlong tap names, unsafe PID/tap values
 
+## Roadmap
+
+### Network Isolation & L7 Proxy
+
+- Isolated `fc-br0` bridge for Firecracker VMs (no direct internet access)
+- Proxmox LXC gateway container with transparent mitmproxy
+- nftables firewall: default-deny outbound, allow SSH inbound
+- TLS interception with automatic CA certificate injection via cloud-init
+- Credential rewriting (inject real API keys without exposing secrets to VMs)
+- Per-VM domain allowlists
+
+### Web Management GUI
+
+- Dark-themed web dashboard running inside the LXC gateway (HTTPS on port 8443)
+- Domain allowlist and credential rewrite rule editing per VM
+- Live traffic log with WebSocket streaming and filtering
+- nftables firewall rule editor with apply/rollback
+- Service health monitoring and restart controls
+- VM overview with DHCP lease table
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on submitting pull requests.
