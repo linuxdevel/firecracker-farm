@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>firecracker-farm — Persistent Firecracker microVMs on Proxmox</title>
+  <meta name="description" content="Shell toolkit for running persistent Firecracker microVMs on Proxmox. Create, start, stop, and SSH in with one command.">
+  <meta property="og:title" content="firecracker-farm">
+  <meta property="og:description" content="Persistent Firecracker microVMs on Proxmox with simple shell commands.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://linuxdevel.github.io/firecracker-farm/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════ HERO ════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-logo">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="8" width="40" height="32" rx="4" stroke="#58a6ff" stroke-width="2" fill="none"/>
+        <rect x="10" y="14" width="10" height="10" rx="2" fill="#58a6ff" opacity="0.3"/>
+        <rect x="10" y="14" width="10" height="10" rx="2" stroke="#58a6ff" stroke-width="1.5" fill="none"/>
+        <rect x="24" y="14" width="10" height="10" rx="2" fill="#3fb950" opacity="0.3"/>
+        <rect x="24" y="14" width="10" height="10" rx="2" stroke="#3fb950" stroke-width="1.5" fill="none"/>
+        <rect x="17" y="28" width="10" height="10" rx="2" fill="#d29922" opacity="0.3"/>
+        <rect x="17" y="28" width="10" height="10" rx="2" stroke="#d29922" stroke-width="1.5" fill="none"/>
+        <circle cx="15" cy="19" r="2" fill="#58a6ff"/>
+        <circle cx="29" cy="19" r="2" fill="#3fb950"/>
+        <circle cx="22" cy="33" r="2" fill="#d29922"/>
+      </svg>
+      firecracker-farm
+    </div>
+    <p class="hero-tagline">
+      Create, start, stop, and SSH into hardware-isolated microVMs with simple shell commands.
+      Persistent disks. DHCP networking. Systemd lifecycle. On your Proxmox host.
+    </p>
+    <div class="hero-install">
+      <span>$</span> curl -fsSL https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/install.sh | sudo bash
+    </div>
+    <div class="hero-actions">
+      <a href="#quickstart" class="btn btn-primary">Get Started</a>
+      <a href="https://github.com/linuxdevel/firecracker-farm" class="btn btn-secondary">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+
+    <!-- Hero graphic: stylized VM fleet -->
+    <div class="hero-graphic">
+      <svg width="600" height="200" viewBox="0 0 600 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- VMs -->
+        <rect x="60" y="20" width="100" height="60" rx="6" fill="#58a6ff" opacity="0.1" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="110" y="45" text-anchor="middle" fill="#58a6ff" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-web01</text>
+        <text x="110" y="62" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="9">2 vCPU · 2G</text>
+
+        <rect x="250" y="20" width="100" height="60" rx="6" fill="#3fb950" opacity="0.1" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="300" y="45" text-anchor="middle" fill="#3fb950" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-app01</text>
+        <text x="300" y="62" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="9">4 vCPU · 4G</text>
+
+        <rect x="440" y="20" width="100" height="60" rx="6" fill="#d29922" opacity="0.1" stroke="#d29922" stroke-width="1.5"/>
+        <text x="490" y="45" text-anchor="middle" fill="#d29922" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-db01</text>
+        <text x="490" y="62" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="9">2 vCPU · 8G</text>
+
+        <!-- KVM labels -->
+        <text x="110" y="100" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">KVM</text>
+        <text x="300" y="100" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">KVM</text>
+        <text x="490" y="100" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">KVM</text>
+
+        <!-- Tap lines -->
+        <line x1="110" y1="80" x2="110" y2="130" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <line x1="300" y1="80" x2="300" y2="130" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <line x1="490" y1="80" x2="490" y2="130" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+        <!-- Bridge -->
+        <rect x="40" y="130" width="520" height="30" rx="4" fill="#3fb950" opacity="0.08" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="300" y="150" text-anchor="middle" fill="#3fb950" font-family="Inter,sans-serif" font-size="12" font-weight="600">vmbr0</text>
+
+        <!-- LAN -->
+        <line x1="300" y1="160" x2="300" y2="185" stroke="#30363d" stroke-width="1.5"/>
+        <text x="300" y="198" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="11">LAN · DHCP</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ FEATURES ════════════════════════════════════════ -->
+<section id="features">
+  <div class="container">
+    <h2 class="section-title">Features</h2>
+    <p class="section-subtitle">Everything you need to run a fleet of microVMs on your Proxmox host.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+          <line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+        <h3>Persistent Disks</h3>
+        <p>Per-instance writable rootfs that survives stop/start cycles. Cloned and resized from an Ubuntu 24.04 cloud template.</p>
+      </div>
+
+      <div class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+          <line x1="6" y1="6" x2="6.01" y2="6"/>
+          <line x1="6" y1="18" x2="6.01" y2="18"/>
+        </svg>
+        <h3>DHCP Networking</h3>
+        <p>Each VM gets a tap device bridged to your LAN. Automatic IP assignment via DHCP with a deterministic MAC address.</p>
+      </div>
+
+      <div class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <h3>Systemd Lifecycle</h3>
+        <p>Managed via systemd template units. VMs persist across host reboots with automatic enable and start.</p>
+      </div>
+
+      <div class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2"/>
+          <line x1="2" y1="8" x2="22" y2="8"/>
+          <line x1="6" y1="12" x2="10" y2="12"/>
+          <line x1="6" y1="16" x2="14" y2="16"/>
+        </svg>
+        <h3>SSH Access</h3>
+        <p><code>fc-ssh</code> auto-resolves the guest IP from the ARP table. No manual IP tracking required.</p>
+      </div>
+
+      <div class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <h3>Configurable Resources</h3>
+        <p>Set disk size, vCPUs, and memory per VM at create time. Sensible defaults for everything.</p>
+      </div>
+
+      <div class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 17l6-6-6-6"/>
+          <line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>
+        <h3>One-Command Install</h3>
+        <p><code>curl | sudo bash</code> installs everything: farm tools, Firecracker binaries, guest kernel, and host config.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ SECURITY ════════════════════════════════════════ -->
+<section id="security">
+  <div class="container">
+    <h2 class="section-title">Why Firecracker?</h2>
+    <p class="comparison-intro">
+      Firecracker uses KVM hardware virtualization to provide VM-level isolation with
+      container-like speed. Each microVM runs its own kernel with a minimal device model,
+      giving you a smaller attack surface than Docker and faster boot times than traditional VMs.
+    </p>
+
+    <div style="overflow-x: auto;">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th>Docker Container</th>
+            <th class="highlight highlight-top">Firecracker microVM</th>
+            <th>Traditional VM</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Isolation</strong></td>
+            <td>Shared kernel (namespaces + cgroups)</td>
+            <td class="highlight">Dedicated kernel + KVM hardware boundary</td>
+            <td>Dedicated kernel + full hypervisor</td>
+          </tr>
+          <tr>
+            <td><strong>Boot time</strong></td>
+            <td>~500ms</td>
+            <td class="highlight">~125ms</td>
+            <td>10 &ndash; 45s</td>
+          </tr>
+          <tr>
+            <td><strong>Memory overhead</strong></td>
+            <td>~10 MB</td>
+            <td class="highlight">~5 MB</td>
+            <td>128 &ndash; 512 MB</td>
+          </tr>
+          <tr>
+            <td><strong>Attack surface</strong></td>
+            <td>Large (shared kernel syscalls)</td>
+            <td class="highlight">Minimal (reduced device model)</td>
+            <td>Large (full QEMU device emulation)</td>
+          </tr>
+          <tr>
+            <td><strong>Escape risk</strong></td>
+            <td>Container escapes are common CVEs</td>
+            <td class="highlight">KVM boundary + minimal VMM</td>
+            <td>Low but heavy footprint</td>
+          </tr>
+          <tr>
+            <td><strong>Root filesystem</strong></td>
+            <td>Layered, ephemeral by default</td>
+            <td class="highlight">Persistent raw ext4</td>
+            <td>Persistent disk image</td>
+          </tr>
+          <tr>
+            <td><strong>Networking</strong></td>
+            <td>Bridge / NAT / overlay</td>
+            <td class="highlight highlight-bottom">Tap + bridge (LAN native)</td>
+            <td>Bridge / NAT</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <strong>Production-proven:</strong> Firecracker was built by AWS for Lambda and Fargate.
+      It processes millions of workloads per second in production.
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ ARCHITECTURE ════════════════════════════════════ -->
+<section id="architecture">
+  <div class="container">
+    <h2 class="section-title">Architecture</h2>
+    <p class="section-subtitle">Each VM runs in its own jailer sandbox with KVM isolation, connected to your LAN via tap devices.</p>
+
+    <div class="arch-container">
+      <svg width="720" height="440" viewBox="0 0 720 440" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Host boundary -->
+        <rect x="20" y="10" width="680" height="370" rx="8" stroke="#30363d" stroke-width="2" stroke-dasharray="6 4" fill="none"/>
+        <text x="40" y="35" fill="#8b949e" font-family="Inter,sans-serif" font-size="13" font-weight="600">Proxmox Host</text>
+
+        <!-- VM 1 -->
+        <rect x="60" y="55" width="160" height="90" rx="6" fill="#58a6ff" opacity="0.08" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="140" y="78" text-anchor="middle" fill="#58a6ff" font-family="Inter,sans-serif" font-size="13" font-weight="600">myvm</text>
+        <text x="140" y="96" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="10">Ubuntu 24.04</text>
+        <text x="140" y="112" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="10">rootfs.raw · 20G</text>
+        <text x="140" y="130" text-anchor="middle" fill="#c9d1d9" font-family="monospace" font-size="9">cloud-init seed</text>
+
+        <!-- VM 2 -->
+        <rect x="280" y="55" width="160" height="90" rx="6" fill="#3fb950" opacity="0.08" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="360" y="78" text-anchor="middle" fill="#3fb950" font-family="Inter,sans-serif" font-size="13" font-weight="600">web01</text>
+        <text x="360" y="96" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="10">Ubuntu 24.04</text>
+        <text x="360" y="112" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="10">rootfs.raw · 30G</text>
+        <text x="360" y="130" text-anchor="middle" fill="#c9d1d9" font-family="monospace" font-size="9">cloud-init seed</text>
+
+        <!-- VM 3 -->
+        <rect x="500" y="55" width="160" height="90" rx="6" fill="#d29922" opacity="0.08" stroke="#d29922" stroke-width="1.5"/>
+        <text x="580" y="78" text-anchor="middle" fill="#d29922" font-family="Inter,sans-serif" font-size="13" font-weight="600">db01</text>
+        <text x="580" y="96" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="10">Ubuntu 24.04</text>
+        <text x="580" y="112" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="10">rootfs.raw · 50G</text>
+        <text x="580" y="130" text-anchor="middle" fill="#c9d1d9" font-family="monospace" font-size="9">cloud-init seed</text>
+
+        <!-- Jailer boxes -->
+        <rect x="75" y="170" width="130" height="45" rx="4" fill="#d29922" opacity="0.08" stroke="#d29922" stroke-width="1.2"/>
+        <text x="140" y="190" text-anchor="middle" fill="#d29922" font-family="Inter,sans-serif" font-size="11" font-weight="600">jailer + KVM</text>
+        <text x="140" y="205" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">firecracker</text>
+
+        <rect x="295" y="170" width="130" height="45" rx="4" fill="#d29922" opacity="0.08" stroke="#d29922" stroke-width="1.2"/>
+        <text x="360" y="190" text-anchor="middle" fill="#d29922" font-family="Inter,sans-serif" font-size="11" font-weight="600">jailer + KVM</text>
+        <text x="360" y="205" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">firecracker</text>
+
+        <rect x="515" y="170" width="130" height="45" rx="4" fill="#d29922" opacity="0.08" stroke="#d29922" stroke-width="1.2"/>
+        <text x="580" y="190" text-anchor="middle" fill="#d29922" font-family="Inter,sans-serif" font-size="11" font-weight="600">jailer + KVM</text>
+        <text x="580" y="205" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">firecracker</text>
+
+        <!-- Connectors: VM to jailer -->
+        <line x1="140" y1="145" x2="140" y2="170" stroke="#30363d" stroke-width="1.5"/>
+        <line x1="360" y1="145" x2="360" y2="170" stroke="#30363d" stroke-width="1.5"/>
+        <line x1="580" y1="145" x2="580" y2="170" stroke="#30363d" stroke-width="1.5"/>
+
+        <!-- Tap labels -->
+        <text x="140" y="240" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="10">fc-myvm0</text>
+        <text x="360" y="240" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="10">fc-web010</text>
+        <text x="580" y="240" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="10">fc-db010</text>
+
+        <!-- Connectors: jailer to tap -->
+        <line x1="140" y1="215" x2="140" y2="248" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <line x1="360" y1="215" x2="360" y2="248" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <line x1="580" y1="215" x2="580" y2="248" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+        <!-- Bridge -->
+        <rect x="50" y="260" width="620" height="40" rx="6" fill="#3fb950" opacity="0.06" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="360" y="285" text-anchor="middle" fill="#3fb950" font-family="Inter,sans-serif" font-size="14" font-weight="600">vmbr0 (Linux bridge)</text>
+
+        <!-- Connectors: tap to bridge -->
+        <line x1="140" y1="248" x2="140" y2="260" stroke="#3fb950" stroke-width="1.5"/>
+        <line x1="360" y1="248" x2="360" y2="260" stroke="#3fb950" stroke-width="1.5"/>
+        <line x1="580" y1="248" x2="580" y2="260" stroke="#3fb950" stroke-width="1.5"/>
+
+        <!-- Systemd label -->
+        <rect x="540" y="320" width="140" height="30" rx="4" fill="#bc8cff" opacity="0.08" stroke="#bc8cff" stroke-width="1.2"/>
+        <text x="610" y="340" text-anchor="middle" fill="#bc8cff" font-family="Inter,sans-serif" font-size="11" font-weight="600">systemd lifecycle</text>
+
+        <!-- Bridge to LAN -->
+        <line x1="360" y1="300" x2="360" y2="340" stroke="#30363d" stroke-width="1.5"/>
+
+        <!-- LAN -->
+        <rect x="300" y="340" width="120" height="30" rx="4" fill="none" stroke="#8b949e" stroke-width="1.5"/>
+        <text x="360" y="360" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="12" font-weight="600">LAN + DHCP</text>
+
+        <!-- External -->
+        <line x1="360" y1="370" x2="360" y2="400" stroke="#30363d" stroke-width="1.5"/>
+        <text x="360" y="418" text-anchor="middle" fill="#58a6ff" font-family="Inter,sans-serif" font-size="12">192.168.1.0/24</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ OPENCLAW ════════════════════════════════════════ -->
+<section id="openclaw">
+  <div class="container">
+    <h2 class="section-title">Example: OpenClaw AI Sandbox</h2>
+    <p class="example-intro">
+      <a href="https://github.com/openclaw/openclaw">OpenClaw</a> is a personal AI assistant
+      that can execute code on your behalf. By default it uses Docker for sandboxing. With
+      firecracker-farm, you can run the sandbox in a hardware-isolated Firecracker microVM instead.
+    </p>
+
+    <div class="example-benefits">
+      <div class="benefit">
+        <svg class="benefit-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <p><strong>KVM-isolated code execution</strong> &mdash; AI-generated code runs inside a dedicated VM, not a shared-kernel container.</p>
+      </div>
+      <div class="benefit">
+        <svg class="benefit-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <p><strong>No container escapes</strong> &mdash; Even malicious code cannot cross the KVM hardware boundary.</p>
+      </div>
+      <div class="benefit">
+        <svg class="benefit-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <p><strong>Separate kernel</strong> &mdash; Guest kernel exploits don't affect the host. The attack surface is minimal.</p>
+      </div>
+      <div class="benefit">
+        <svg class="benefit-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <p><strong>Persistent environment</strong> &mdash; The sandbox disk survives restarts, enabling stateful dev environments.</p>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <pre><span class="comment"># 1. Create a sandbox VM with 2 vCPUs and 2GB RAM</span>
+<span class="cmd">fc-create</span> <span class="arg">openclaw-sandbox</span> <span class="flag">--disk-size 30G --vcpus 2 --memory 2g</span>
+
+<span class="comment"># 2. Start the sandbox</span>
+<span class="cmd">fc-start</span> <span class="arg">openclaw-sandbox</span>
+
+<span class="comment"># 3. SSH in and install OpenClaw dependencies</span>
+<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- sudo apt-get update
+<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- sudo apt-get install -y nodejs npm
+
+<span class="comment"># 4. Check the sandbox IP for OpenClaw config</span>
+<span class="cmd">fc-status</span> <span class="arg">openclaw-sandbox</span></pre>
+    </div>
+
+    <div class="sandbox-compare">
+      <div class="sandbox-card docker">
+        <h4>Docker Sandbox</h4>
+        <ul>
+          <li>Shared host kernel</li>
+          <li>Namespace-only isolation</li>
+          <li>Container escape CVEs affect host</li>
+          <li>Kernel exploits reach the host</li>
+        </ul>
+      </div>
+      <div class="sandbox-card preferred">
+        <h4>Firecracker Sandbox</h4>
+        <ul>
+          <li>Dedicated guest kernel</li>
+          <li>KVM hardware isolation</li>
+          <li>Minimal VMM attack surface</li>
+          <li>~125ms boot, ~5MB overhead</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ QUICKSTART ══════════════════════════════════════ -->
+<section id="quickstart">
+  <div class="container">
+    <h2 class="section-title">Quick Start</h2>
+    <p class="section-subtitle">From zero to a running microVM in four steps.</p>
+
+    <div class="quickstart-steps">
+      <div class="quickstart-step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>Install</h3>
+          <div class="terminal">
+            <pre><span class="cmd">curl</span> <span class="flag">-fsSL</span> https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/install.sh | <span class="cmd">sudo bash</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="quickstart-step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>Build Template</h3>
+          <div class="terminal">
+            <pre><span class="cmd">sudo bash</span> <span class="flag">-c</span> <span class="arg">'source /opt/firecracker-farm/lib/image.sh && fc_image_build_template'</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="quickstart-step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>Create &amp; Start a VM</h3>
+          <div class="terminal">
+            <pre><span class="cmd">fc-create</span> <span class="arg">myvm</span> <span class="flag">--disk-size 20G --vcpus 2 --memory 2g</span>
+<span class="cmd">fc-start</span> <span class="arg">myvm</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="quickstart-step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <h3>SSH In</h3>
+          <div class="terminal">
+            <pre><span class="comment"># Wait ~30s for cloud-init + DHCP, then:</span>
+<span class="cmd">fc-ssh</span> <span class="arg">myvm</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ FOOTER ══════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/linuxdevel/firecracker-farm">GitHub</a>
+      <a href="https://github.com/linuxdevel/firecracker-farm/blob/main/docs/reference.md">Reference</a>
+      <a href="https://github.com/linuxdevel/firecracker-farm/blob/main/CONTRIBUTING.md">Contributing</a>
+      <a href="https://github.com/linuxdevel/firecracker-farm/blob/main/LICENSE">License</a>
+    </div>
+    <p>Apache 2.0 &mdash; Built for Proxmox</p>
+    <p>Powered by <a href="https://github.com/firecracker-microvm/firecracker">Firecracker</a> from AWS</p>
+  </div>
+</footer>
+
+</body>
+</html>
