@@ -203,7 +203,7 @@ Test suites:
 
 ## Roadmap
 
-### Network Isolation & L7 Proxy
+### Network Isolation & L7 Proxy (planned)
 
 - Isolated `fc-br0` bridge for Firecracker VMs (no direct internet access)
 - Proxmox LXC gateway container with transparent mitmproxy
@@ -212,7 +212,7 @@ Test suites:
 - Credential rewriting (inject real API keys without exposing secrets to VMs)
 - Per-VM domain allowlists
 
-### Web Management GUI
+### Web Management GUI (planned)
 
 - Dark-themed web dashboard running inside the LXC gateway (HTTPS on port 8443)
 - Domain allowlist and credential rewrite rule editing per VM
@@ -231,7 +231,7 @@ Firecracker is a completely separate Virtual Machine Monitor (VMM). Even though 
 
 Proxmox does not have a plugin architecture for alternative hypervisors, so there is no supported way to inject Firecracker VMs into the PVE interface without modifying Proxmox source code (which would break on every update).
 
-**Workaround:** The firecracker-farm project includes its own web management GUI (running inside the proxy LXC gateway on port 8443) that provides a dedicated dashboard for monitoring and managing your microVMs, including DHCP lease tables, live traffic logs, and service health.
+**Planned workaround:** The firecracker-farm project will include its own web management GUI (running inside a proxy LXC gateway on port 8443) to provide a dedicated dashboard for monitoring and managing your microVMs. In the meantime, use `fc-list` and `fc-status <name>` from the command line to view your running VMs.
 
 ## Contributing
 

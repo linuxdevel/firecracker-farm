@@ -478,7 +478,7 @@
 <section id="roadmap">
   <div class="container">
     <h2 class="section-title">Roadmap</h2>
-    <p class="section-subtitle">What's coming next for firecracker-farm.</p>
+    <p class="section-subtitle">Planned features &mdash; not yet implemented.</p>
 
     <div class="features-grid">
       <div class="feature-card">
@@ -620,10 +620,11 @@
           Proxmox source code (which would break on every update).
         </p>
         <div class="callout" style="margin-top: 16px; border-left-color: #3fb950;">
-          <strong>Workaround:</strong> The firecracker-farm project includes its own
-          <a href="#roadmap">web management GUI</a> (running inside the proxy LXC gateway on
-          port 8443) that provides a dedicated dashboard for monitoring and managing your
-          microVMs, including DHCP lease tables, live traffic logs, and service health.
+          <strong>Planned workaround:</strong> A future version of firecracker-farm will include
+          its own <a href="#roadmap">web management GUI</a> (running inside a proxy LXC gateway
+          on port 8443) to provide a dedicated dashboard for monitoring and managing your
+          microVMs. In the meantime, use <code>fc-list</code> and <code>fc-status &lt;name&gt;</code>
+          from the command line to view your running VMs.
         </div>
       </div>
     </div>
