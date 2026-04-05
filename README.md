@@ -221,6 +221,18 @@ Test suites:
 - Service health monitoring and restart controls
 - VM overview with DHCP lease table
 
+## FAQ
+
+### Why don't Firecracker VMs show up in the Proxmox web GUI?
+
+Proxmox's web interface (PVE) is hardcoded to manage two types of guests: QEMU/KVM virtual machines (via `qm` and configs in `/etc/pve/qemu-server/`) and LXC containers (via `pct` and configs in `/etc/pve/lxc/`).
+
+Firecracker is a completely separate Virtual Machine Monitor (VMM). Even though it uses the same underlying `/dev/kvm` hardware virtualization as QEMU, Proxmox has no awareness of Firecracker processes. To Proxmox, a running Firecracker microVM looks like an ordinary background Linux process (the `firecracker` binary managed by a systemd service) consuming CPU and RAM on the host.
+
+Proxmox does not have a plugin architecture for alternative hypervisors, so there is no supported way to inject Firecracker VMs into the PVE interface without modifying Proxmox source code (which would break on every update).
+
+**Workaround:** The firecracker-farm project includes its own web management GUI (running inside the proxy LXC gateway on port 8443) that provides a dedicated dashboard for monitoring and managing your microVMs, including DHCP lease tables, live traffic logs, and service health.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on submitting pull requests.

@@ -591,6 +591,45 @@
   </div>
 </section>
 
+<!-- ════════════════════════════════════════════ FAQ ══════════════════════════════════════════════ -->
+<section id="faq">
+  <div class="container">
+    <h2 class="section-title">FAQ</h2>
+    <p class="section-subtitle">Common questions about running Firecracker on Proxmox.</p>
+
+    <div class="faq-item">
+      <h3 class="faq-question">Why don't Firecracker VMs show up in the Proxmox web GUI?</h3>
+      <div class="faq-answer">
+        <p>
+          Proxmox&rsquo;s web interface (PVE) is hardcoded to manage two types of guests:
+          <strong>QEMU/KVM virtual machines</strong> (via <code>qm</code> and configs in
+          <code>/etc/pve/qemu-server/</code>) and <strong>LXC containers</strong> (via
+          <code>pct</code> and configs in <code>/etc/pve/lxc/</code>).
+        </p>
+        <p>
+          Firecracker is a completely separate Virtual Machine Monitor (VMM). Even though it
+          uses the same underlying <code>/dev/kvm</code> hardware virtualization as QEMU,
+          Proxmox has no awareness of Firecracker processes. To Proxmox, a running Firecracker
+          microVM looks like an ordinary background Linux process &mdash; the
+          <code>firecracker</code> binary managed by a systemd service &mdash; consuming CPU
+          and RAM on the host.
+        </p>
+        <p>
+          Proxmox does not have a plugin architecture for alternative hypervisors, so there is
+          no supported way to inject Firecracker VMs into the PVE interface without modifying
+          Proxmox source code (which would break on every update).
+        </p>
+        <div class="callout" style="margin-top: 16px; border-left-color: #3fb950;">
+          <strong>Workaround:</strong> The firecracker-farm project includes its own
+          <a href="#roadmap">web management GUI</a> (running inside the proxy LXC gateway on
+          port 8443) that provides a dedicated dashboard for monitoring and managing your
+          microVMs, including DHCP lease tables, live traffic logs, and service health.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ════════════════════════════════════════════ FOOTER ══════════════════════════════════════════ -->
 <footer class="footer">
   <div class="container">

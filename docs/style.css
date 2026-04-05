@@ -289,6 +289,36 @@ section { padding: 5rem 0; }
 }
 .step-content .terminal { margin-top: 0.5rem; }
 
+/* ── FAQ ── */
+#faq { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.faq-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+.faq-question {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 1rem;
+}
+.faq-answer p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+}
+.faq-answer p:last-child { margin-bottom: 0; }
+.faq-answer code {
+  background: var(--surface-raised);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
 /* ── Footer ── */
 .footer {
   border-top: 1px solid var(--border);
