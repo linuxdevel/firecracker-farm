@@ -337,9 +337,12 @@
   <div class="container">
     <h2 class="section-title">Example: OpenClaw AI Sandbox</h2>
     <p class="example-intro">
-      <a href="https://github.com/openclaw/openclaw">OpenClaw</a> is a personal AI assistant
-      that can execute code on your behalf. By default it uses Docker for sandboxing. With
-      firecracker-farm, you can run the sandbox in a hardware-isolated Firecracker microVM instead.
+      <a href="https://github.com/openclaw/openclaw">OpenClaw</a> is an open-source personal AI
+      assistant that runs on your own devices and connects to the channels you already use
+      (WhatsApp, Telegram, Slack, Discord, and more). It includes an agent runtime that can
+      execute code on your behalf &mdash; by default inside a Docker container. With
+      firecracker-farm, you can replace that Docker sandbox with a hardware-isolated Firecracker
+      microVM, giving the AI code execution environment full KVM-level isolation from your host.
     </p>
 
     <div class="example-benefits">
@@ -368,12 +371,32 @@
 <span class="comment"># 2. Start the sandbox</span>
 <span class="cmd">fc-start</span> <span class="arg">openclaw-sandbox</span>
 
-<span class="comment"># 3. SSH in and install OpenClaw dependencies</span>
+<span class="comment"># 3. SSH in and install Node.js (OpenClaw requires Node 22.16+ or 24)</span>
 <span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- sudo apt-get update
-<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- sudo apt-get install -y nodejs npm
+<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- sudo apt-get install -y ca-certificates curl gnupg
+<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- 'curl -fsSL https://deb.nodesource.com/setup_24.x | sudo bash -'
+<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- sudo apt-get install -y nodejs
 
-<span class="comment"># 4. Check the sandbox IP for OpenClaw config</span>
+<span class="comment"># 4. Install OpenClaw inside the VM</span>
+<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- sudo npm install -g openclaw@latest
+
+<span class="comment"># 5. Run the OpenClaw onboarding wizard (sets up gateway, channels, skills)</span>
+<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- openclaw onboard --install-daemon
+
+<span class="comment"># 6. Start the OpenClaw gateway</span>
+<span class="cmd">fc-ssh</span> <span class="arg">openclaw-sandbox</span> -- openclaw gateway --port 18789 --verbose
+
+<span class="comment"># 7. Check the sandbox IP (use this in your OpenClaw client config)</span>
 <span class="cmd">fc-status</span> <span class="arg">openclaw-sandbox</span></pre>
+    </div>
+
+    <div class="callout" style="margin-bottom: 24px; border-left-color: #58a6ff;">
+      <strong>OpenClaw resources:</strong>
+      <a href="https://github.com/openclaw/openclaw">GitHub</a> &middot;
+      <a href="https://docs.openclaw.ai">Documentation</a> &middot;
+      <a href="https://docs.openclaw.ai/start/getting-started">Getting Started</a> &middot;
+      <a href="https://docs.openclaw.ai/install/docker">Docker Install</a> &middot;
+      <a href="https://docs.openclaw.ai/gateway/security">Security Model</a>
     </div>
 
     <div class="sandbox-compare">
