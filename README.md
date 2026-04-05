@@ -1,6 +1,31 @@
 # firecracker-farm
 
-Shell-based tooling for creating and managing persistent Firecracker microVMs on a Proxmox host.
+Shell-based tooling for creating and managing persistent [Firecracker](https://firecracker-microvm.github.io/) microVMs on a Proxmox host.
+
+## About Firecracker
+
+[Firecracker](https://github.com/firecracker-microvm/firecracker) is an open-source virtual machine monitor (VMM) built by AWS for running multi-tenant container and serverless workloads. It uses Linux KVM to create lightweight microVMs that provide the security and isolation of traditional VMs with the speed and resource efficiency of containers.
+
+Key characteristics:
+
+- **Hardware-level isolation** -- Each microVM runs its own Linux kernel behind a KVM hardware boundary, unlike containers which share the host kernel.
+- **Minimal device model** -- Firecracker exposes only a small number of emulated devices (virtio-net, virtio-block, serial, and a minimal keyboard controller), drastically reducing the attack surface compared to QEMU.
+- **Fast startup** -- MicroVMs boot in under 125ms and require as little as 5 MiB of memory overhead.
+- **Production-proven** -- Firecracker powers AWS Lambda and AWS Fargate, processing millions of workloads per second.
+
+Firecracker is developed and maintained by Amazon Web Services under the Apache 2.0 license.
+
+**Upstream resources:**
+
+| Resource | Link |
+|----------|------|
+| GitHub repository | [firecracker-microvm/firecracker](https://github.com/firecracker-microvm/firecracker) |
+| Official documentation | [firecracker-microvm.github.io](https://firecracker-microvm.github.io/) |
+| Design overview | [design.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/design.md) |
+| Getting started | [getting-started.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/getting-started.md) |
+| Production host setup | [prod-host-setup.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/prod-host-setup.md) |
+| Jailer documentation | [jailer.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/jailer.md) |
+| Snapshotting | [snapshotting.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/snapshotting/versioning.md) |
 
 ## What it does
 

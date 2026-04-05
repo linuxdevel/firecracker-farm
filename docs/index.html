@@ -160,8 +160,11 @@
   <div class="container">
     <h2 class="section-title">Why Firecracker?</h2>
     <p class="comparison-intro">
-      Firecracker uses KVM hardware virtualization to provide VM-level isolation with
-      container-like speed. Each microVM runs its own kernel with a minimal device model,
+      <a href="https://github.com/firecracker-microvm/firecracker">Firecracker</a> is an
+      open-source virtual machine monitor (VMM) built by AWS for running multi-tenant
+      container and serverless workloads. It uses Linux KVM to create lightweight microVMs
+      that provide the security and isolation of traditional VMs with the speed and resource
+      efficiency of containers. Each microVM runs its own kernel with a minimal device model,
       giving you a smaller attack surface than Docker and faster boot times than traditional VMs.
     </p>
 
@@ -224,7 +227,18 @@
 
     <div class="callout">
       <strong>Production-proven:</strong> Firecracker was built by AWS for Lambda and Fargate.
-      It processes millions of workloads per second in production.
+      It processes millions of workloads per second in production. Developed and maintained
+      under the Apache 2.0 license.
+    </div>
+
+    <div class="callout" style="margin-top: 16px; border-left-color: #58a6ff;">
+      <strong>Upstream resources:</strong>
+      <a href="https://github.com/firecracker-microvm/firecracker">GitHub</a> &middot;
+      <a href="https://firecracker-microvm.github.io/">Documentation</a> &middot;
+      <a href="https://github.com/firecracker-microvm/firecracker/blob/main/docs/design.md">Design</a> &middot;
+      <a href="https://github.com/firecracker-microvm/firecracker/blob/main/docs/getting-started.md">Getting Started</a> &middot;
+      <a href="https://github.com/firecracker-microvm/firecracker/blob/main/docs/jailer.md">Jailer</a> &middot;
+      <a href="https://github.com/firecracker-microvm/firecracker/blob/main/docs/prod-host-setup.md">Production Host Setup</a>
     </div>
   </div>
 </section>
