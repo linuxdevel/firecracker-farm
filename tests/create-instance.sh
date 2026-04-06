@@ -242,11 +242,12 @@ EOF
 test_instance_seed_uses_template_cloud_init_content() (
   source "$REPO_ROOT/lib/image.sh"
 
-  local tmpdir user_data_path meta_data_path disk_path mount_target
+  local tmpdir user_data_path meta_data_path network_config_path disk_path mount_target
   tmpdir=$(mktemp -d)
   mkdir -p "$tmpdir/images" "$tmpdir/vms/testvm" "$tmpdir/templates"
   user_data_path="$tmpdir/vms/testvm/user-data"
   meta_data_path="$tmpdir/vms/testvm/meta-data"
+  network_config_path="$tmpdir/vms/testvm/network-config"
   disk_path="$tmpdir/vms/testvm/rootfs.raw"
   mount_target="$tmpdir/mount-target"
   printf 'fake-rootfs' > "$disk_path"
@@ -260,6 +261,7 @@ test_instance_seed_uses_template_cloud_init_content() (
   # Place cloud-init templates with placeholder tokens
   cp "$REPO_ROOT/templates/cloud-init-user-data.yaml" "$tmpdir/templates/"
   cp "$REPO_ROOT/templates/cloud-init-meta-data.yaml" "$tmpdir/templates/"
+  cp "$REPO_ROOT/templates/cloud-init-network-config.yaml" "$tmpdir/templates/"
 
   # Mock mktemp to return a predictable mount point
   mktemp() {
@@ -284,11 +286,18 @@ test_instance_seed_uses_template_cloud_init_content() (
   grep -q '^instance-id: testvm$' "$meta_data_path" || fail "instance meta-data missing instance-id"
   grep -q '^local-hostname: testvm$' "$meta_data_path" || fail "instance meta-data missing local-hostname"
 
+  # Verify network-config reference copy
+  [[ -f "$network_config_path" ]] || fail "instance network-config reference copy missing"
+  grep -q '^version: 2$' "$network_config_path" || fail "instance network-config missing version 2 header"
+  grep -q 'dhcp4: true' "$network_config_path" || fail "instance network-config missing dhcp4"
+
   # Verify seed files were injected into the (mocked) mount point
   [[ -f "$mount_target/var/lib/cloud/seed/nocloud/user-data" ]] || fail "seed user-data not injected into rootfs"
   [[ -f "$mount_target/var/lib/cloud/seed/nocloud/meta-data" ]] || fail "seed meta-data not injected into rootfs"
+  [[ -f "$mount_target/var/lib/cloud/seed/nocloud/network-config" ]] || fail "seed network-config not injected into rootfs"
   grep -q '^  - name: seeduser$' "$mount_target/var/lib/cloud/seed/nocloud/user-data" || fail "injected user-data missing guest user"
   grep -q '^instance-id: testvm$' "$mount_target/var/lib/cloud/seed/nocloud/meta-data" || fail "injected meta-data missing instance-id"
+  grep -q 'dhcp4: true' "$mount_target/var/lib/cloud/seed/nocloud/network-config" || fail "injected network-config missing dhcp4"
 )
 
 test_instance_creation_rejects_vm_names_with_overlong_tap_names() (

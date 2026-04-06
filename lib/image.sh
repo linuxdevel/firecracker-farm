@@ -358,19 +358,30 @@ fc_image_template_user_data_path() {
   fc_image_user_data_path
 }
 
+fc_image_instance_network_config_path() {
+  local vm_name=$1
+  printf '%s/network-config\n' "$(fc_image_instance_dir "$vm_name")"
+}
+
 fc_image_create_instance_seed() {
   local vm_name=$1
   local disk_path=$2
   local guest_user=$3
   local ssh_public_key=$4
-  local user_data_path meta_data_path mount_dir
+  local user_data_path meta_data_path network_config_path mount_dir
+  local network_config_template
 
   user_data_path=$(fc_image_instance_user_data_path "$vm_name")
   meta_data_path=$(fc_image_instance_meta_data_path "$vm_name")
+  network_config_path=$(fc_image_instance_network_config_path "$vm_name")
+  network_config_template="$(fc_image_templates_dir)/cloud-init-network-config.yaml"
 
   # Render user-data from the YAML template with per-VM credentials
   fc_image_render_user_data "$ssh_public_key" "$user_data_path" "$guest_user" || return 1
   fc_image_render_meta_data "$vm_name" "$vm_name" "$meta_data_path" || return 1
+
+  # Copy static network-config (DHCP on all ethernets) for reference
+  cp -- "$network_config_template" "$network_config_path" || return 1
 
   # Inject cloud-init seed directly into the rootfs so the NoCloud
   # datasource finds it without needing a separate seed drive (the
@@ -389,6 +400,9 @@ fc_image_create_instance_seed() {
     umount "$mount_dir"; rmdir "$mount_dir"; return 1
   }
   cp -- "$meta_data_path"  "$mount_dir/var/lib/cloud/seed/nocloud/meta-data" || {
+    umount "$mount_dir"; rmdir "$mount_dir"; return 1
+  }
+  cp -- "$network_config_path" "$mount_dir/var/lib/cloud/seed/nocloud/network-config" || {
     umount "$mount_dir"; rmdir "$mount_dir"; return 1
   }
 
