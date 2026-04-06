@@ -12,6 +12,8 @@ ExecStopPost={{FC_CONTROL_ROOT}}/bin/fc-stop --direct %i
 KillMode=control-group
 KillSignal=SIGTERM
 TimeoutStopSec=30
+Restart=always
+RestartSec=1
 
 [Install]
 WantedBy=multi-user.target
