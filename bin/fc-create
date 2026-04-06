@@ -147,6 +147,10 @@ fc_create_main() {
         fc_create_usage
         return 0
         ;;
+      -V|--version)
+        printf 'firecracker-farm %s\n' "$(fc_version)"
+        return 0
+        ;;
       --*)
         fc_error "Unknown argument: $1"
         fc_create_usage

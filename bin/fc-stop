@@ -43,6 +43,7 @@ fc_stop_main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -h|--help) fc_stop_usage; return 0 ;;
+      -V|--version) printf 'firecracker-farm %s\n' "$(fc_version)"; return 0 ;;
       --direct) direct=1; shift ;;
       --force) force=1; shift ;;
       --*) fc_error "Unknown option: $1"; return 1 ;;

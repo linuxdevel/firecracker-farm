@@ -47,6 +47,9 @@ jobs:
           cp README.md "build/${ARCHIVE_DIR}/"
           cp -r docs/ "build/${ARCHIVE_DIR}/docs/"
 
+          # Stamp the build version
+          printf '%s\n' "${VERSION}" > "build/${ARCHIVE_DIR}/VERSION"
+
           # Remove plan docs if they leaked in
           rm -rf "build/${ARCHIVE_DIR}/docs/plans/"
 

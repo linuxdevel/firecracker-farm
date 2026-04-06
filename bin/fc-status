@@ -33,6 +33,10 @@ fc_status_main() {
       fc_status_usage
       return 0
       ;;
+    -V|--version)
+      printf 'firecracker-farm %s\n' "$(fc_version)"
+      return 0
+      ;;
   esac
 
   fc_require_argument_count "$#" 1 "Usage: fc-status <name>" || return 1

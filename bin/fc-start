@@ -100,6 +100,10 @@ fc_start_main() {
       fc_start_usage
       return 0
       ;;
+    -V|--version)
+      printf 'firecracker-farm %s\n' "$(fc_version)"
+      return 0
+      ;;
   esac
 
   if [[ "${1:-}" == '--direct' ]]; then

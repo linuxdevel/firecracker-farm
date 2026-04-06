@@ -39,6 +39,10 @@ fc_list_main() {
       fc_list_usage
       return 0
       ;;
+    -V|--version)
+      printf 'firecracker-farm %s\n' "$(fc_version)"
+      return 0
+      ;;
   esac
 
   if ! fc_running_as_root; then

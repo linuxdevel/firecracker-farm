@@ -820,6 +820,18 @@ EOF
   grep -q 'Destroyed VM testvm' "$output_file" || fail "fc-destroy missing success message"
 )
 
+test_all_commands_support_version_flag() (
+  local cmd output
+  for cmd in "$REPO_ROOT"/bin/fc-*; do
+    output=$(bash "$cmd" --version 2>&1) || fail "$(basename "$cmd") --version exited non-zero"
+    [[ "$output" == firecracker-farm\ * ]] || fail "$(basename "$cmd") --version output '$output' does not start with 'firecracker-farm '"
+  done
+
+  # Also verify -V short flag works
+  output=$(bash "$REPO_ROOT/bin/fc-list" -V 2>&1) || fail "fc-list -V exited non-zero"
+  [[ "$output" == firecracker-farm\ * ]] || fail "fc-list -V output '$output' does not start with 'firecracker-farm '"
+)
+
 main() {
   test_disk_size_parser_accepts_gib_and_mib || return 1
   test_instance_creation_requires_existing_template || return 1
@@ -845,6 +857,7 @@ main() {
   test_fc_destroy_fails_for_nonexistent_vm || return 1
   test_fc_destroy_requires_confirmation_non_interactive || return 1
   test_fc_destroy_removes_instance_with_yes_flag || return 1
+  test_all_commands_support_version_flag || return 1
   printf 'PASS: instance creation checks\n'
 }
 

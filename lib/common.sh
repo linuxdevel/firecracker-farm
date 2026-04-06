@@ -13,6 +13,21 @@ fc_repo_root() {
   )
 }
 
+fc_version() {
+  local root
+  root=$(fc_repo_root)
+  # Prefer VERSION file (present in release tarballs)
+  if [[ -f "$root/VERSION" ]]; then
+    cat "$root/VERSION"
+    return 0
+  fi
+  # Fall back to git describe (development checkout)
+  if command -v git >/dev/null 2>&1 && git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
+    git -C "$root" describe --tags --always 2>/dev/null && return 0
+  fi
+  printf 'unknown\n'
+}
+
 fc_load_config() {
   # shellcheck source=./config.sh
   source "$(fc_repo_root)/lib/config.sh"
