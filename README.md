@@ -2,6 +2,8 @@
 
 Shell-based tooling for creating and managing persistent [Firecracker](https://firecracker-microvm.github.io/) microVMs on a Proxmox host.
 
+> **Project overview:** For a high-level introduction to the architecture, features, and quick-start workflow, visit the [firecracker-farm project page](https://linuxdevel.github.io/firecracker-farm/).
+
 ## About Firecracker
 
 [Firecracker](https://github.com/firecracker-microvm/firecracker) is an open-source virtual machine monitor (VMM) built by AWS for running multi-tenant container and serverless workloads. It uses Linux KVM to create lightweight microVMs that provide the security and isolation of traditional VMs with the speed and resource efficiency of containers.
