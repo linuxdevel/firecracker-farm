@@ -10,3 +10,7 @@ users:
       - __FC_SSH_AUTHORIZED_KEY__
 ssh_pwauth: false
 disable_root: true
+swap:
+  filename: /swapfile
+  size: auto
+  maxsize: 2147483648
