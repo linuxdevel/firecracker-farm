@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
 # shellcheck source=../lib/common.sh
 source "$SCRIPT_DIR/../lib/common.sh"
 # shellcheck source=../lib/image.sh
@@ -11,17 +11,76 @@ source "$SCRIPT_DIR/../lib/network.sh"
 fc_load_config
 
 fc_create_usage() {
-  cat <<EOF
-Usage: fc-create <name> [--disk-size SIZE] [--vcpus N] [--memory SIZE]
+  cat >&2 <<EOF
+Usage: fc-create <name> [OPTIONS]
 
-Creates a persistent per-instance rootfs clone and metadata only.
+Creates a persistent per-instance rootfs clone and metadata.
 
-Options:
-  --disk-size SIZE   Disk size (e.g. 20G, 512M). Prompted interactively if omitted.
-  --vcpus N          Number of vCPUs (integer >= 1, default: $FC_DEFAULT_VCPUS).
-  --memory SIZE      Memory allocation (e.g. 2048m, 2g). Minimum 128 MiB.
-                     Default: ${FC_DEFAULT_MEMORY_MIB}m.
+Guest credentials (required):
+  --guest-user USER      Username for the VM guest (prompted if omitted).
+  --ssh-key-file PATH    Path to an SSH public key file (prompted if omitted).
+  --ssh-key KEY          SSH public key string (prompted if omitted).
+                         Mutually exclusive with --ssh-key-file.
+
+Resource options:
+  --disk-size SIZE       Disk size (e.g. 20G, 512M). Prompted if omitted.
+  --vcpus N              Number of vCPUs (integer >= 1, default: $FC_DEFAULT_VCPUS).
+  --memory SIZE          Memory allocation (e.g. 2048m, 2g). Minimum 128 MiB.
+                         Default: ${FC_DEFAULT_MEMORY_MIB}m.
+
+  -h, --help             Show this help text.
+
+When run interactively (terminal attached), omitted credential options are
+prompted. When run non-interactively, all credentials must be provided via
+flags.
+
+Examples:
+  fc-create myvm --disk-size 20G
+  fc-create myvm --guest-user ops --ssh-key-file ~/.ssh/id_ed25519.pub --disk-size 20G
+  fc-create myvm --guest-user ops --ssh-key "ssh-ed25519 AAAA..." --disk-size 20G
 EOF
+}
+
+fc_create_prompt_guest_user() {
+  local response=
+  printf 'Guest username: ' >&2
+  IFS= read -r response || return 1
+  if [[ -z "$response" ]]; then
+    fc_error "guest username cannot be empty"
+    return 1
+  fi
+  printf '%s\n' "$response"
+}
+
+fc_create_prompt_ssh_key() {
+  local response=
+  printf 'SSH public key (paste key or path to .pub file): ' >&2
+  IFS= read -r response || return 1
+  if [[ -z "$response" ]]; then
+    fc_error "SSH key cannot be empty"
+    return 1
+  fi
+  printf '%s\n' "$response"
+}
+
+fc_create_resolve_ssh_key() {
+  local input=$1
+
+  # If it looks like an SSH public key (starts with ssh- or ecdsa-), use it directly
+  if [[ "$input" =~ ^(ssh-|ecdsa-|sk-) ]]; then
+    printf '%s\n' "$input"
+    return 0
+  fi
+
+  # Otherwise treat it as a file path
+  local expanded
+  expanded=$(fc_image_expand_path "$input")
+  if [[ ! -f "$expanded" ]]; then
+    fc_error "SSH key file not found: $expanded"
+    return 1
+  fi
+
+  fc_image_read_ssh_public_key "$expanded"
 }
 
 fc_create_main() {
@@ -30,9 +89,36 @@ fc_create_main() {
   local disk_size=
   local vcpus=
   local memory=
+  local guest_user=
+  local ssh_key_file=
+  local ssh_key=
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --guest-user)
+        if [[ $# -lt 2 ]]; then
+          fc_error "--guest-user requires a value"
+          return 1
+        fi
+        guest_user=$2
+        shift 2
+        ;;
+      --ssh-key-file)
+        if [[ $# -lt 2 ]]; then
+          fc_error "--ssh-key-file requires a value"
+          return 1
+        fi
+        ssh_key_file=$2
+        shift 2
+        ;;
+      --ssh-key)
+        if [[ $# -lt 2 ]]; then
+          fc_error "--ssh-key requires a value"
+          return 1
+        fi
+        ssh_key=$2
+        shift 2
+        ;;
       --disk-size)
         if [[ $# -lt 2 ]]; then
           fc_error "--disk-size requires a value"
@@ -63,12 +149,13 @@ fc_create_main() {
         ;;
       --*)
         fc_error "Unknown argument: $1"
-        fc_create_usage >&2
+        fc_create_usage
         return 1
         ;;
       *)
         if [[ -n "$vm_name" ]]; then
-          fc_error "Usage: fc-create <name> [--disk-size SIZE] [--vcpus N] [--memory SIZE]"
+          fc_error "unexpected positional argument: $1"
+          fc_create_usage
           return 1
         fi
         vm_name=$1
@@ -78,10 +165,51 @@ fc_create_main() {
   done
 
   if [[ -z "$vm_name" ]]; then
-    fc_error "Usage: fc-create <name> [--disk-size SIZE] [--vcpus N] [--memory SIZE]"
+    fc_error "VM name is required"
+    fc_create_usage
     return 1
   fi
 
+  # --- Guest user ---
+  if [[ -z "$guest_user" ]]; then
+    if [[ -t 0 ]]; then
+      guest_user=$(fc_create_prompt_guest_user) || return 1
+    else
+      fc_error "--guest-user is required when stdin is not interactive"
+      return 1
+    fi
+  fi
+
+  # --- SSH key ---
+  if [[ -n "$ssh_key_file" && -n "$ssh_key" ]]; then
+    fc_error "--ssh-key-file and --ssh-key are mutually exclusive"
+    return 1
+  fi
+
+  local ssh_public_key=
+  if [[ -n "$ssh_key" ]]; then
+    ssh_public_key="$ssh_key"
+  elif [[ -n "$ssh_key_file" ]]; then
+    ssh_public_key=$(fc_create_resolve_ssh_key "$ssh_key_file") || return 1
+  else
+    # Interactive prompt
+    if [[ -t 0 ]]; then
+      local ssh_input
+      ssh_input=$(fc_create_prompt_ssh_key) || return 1
+      ssh_public_key=$(fc_create_resolve_ssh_key "$ssh_input") || return 1
+    else
+      fc_error "--ssh-key-file or --ssh-key is required when stdin is not interactive"
+      return 1
+    fi
+  fi
+
+  # Validate SSH key looks plausible
+  if [[ ! "$ssh_public_key" =~ ^(ssh-|ecdsa-|sk-) ]]; then
+    fc_error "SSH public key does not look valid (expected ssh-*, ecdsa-*, or sk-*)"
+    return 1
+  fi
+
+  # --- Disk size ---
   if [[ -z "$disk_size" ]]; then
     if [[ -t 0 ]]; then
       disk_size=$(fc_image_prompt_disk_size) || return 1
@@ -91,7 +219,7 @@ fc_create_main() {
     fi
   fi
 
-  # Validate and default vCPUs
+  # --- vCPUs ---
   if [[ -z "$vcpus" ]]; then
     vcpus=$FC_DEFAULT_VCPUS
   fi
@@ -100,7 +228,7 @@ fc_create_main() {
     return 1
   fi
 
-  # Validate and default memory
+  # --- Memory ---
   local mem_size_mib
   if [[ -z "$memory" ]]; then
     mem_size_mib=$FC_DEFAULT_MEMORY_MIB
@@ -112,11 +240,13 @@ fc_create_main() {
     return 1
   fi
 
+  # --- Sudo re-exec (passes all original flags through) ---
   if ! fc_running_as_root; then
     fc_reexec_with_sudo "$0" "${original_args[@]}"
   fi
 
-  fc_image_create_instance_disk "$vm_name" "$disk_size" || return 1
+  # --- Create the VM ---
+  fc_image_create_instance_disk "$vm_name" "$disk_size" "$guest_user" "$ssh_public_key" || return 1
   fc_network_prepare_instance_metadata "$vm_name" "$(fc_image_instance_metadata_path "$vm_name")"
 
   # Write per-instance compute parameters to vm.env
@@ -125,6 +255,7 @@ fc_create_main() {
   cat >> "$metadata_path" <<EOF
 VCPU_COUNT=$vcpus
 MEM_SIZE_MIB=$mem_size_mib
+GUEST_USER=$guest_user
 EOF
 }
 

@@ -35,7 +35,7 @@ test_instance_creation_requires_existing_template() (
   fc_image_raw_path() { printf '%s\n' "$tmpdir/images/ubuntu-template.raw"; }
   fc_has_free_space_mib() { return 0; }
 
-  if fc_image_create_instance_disk "testvm" "20G"; then
+  if fc_image_create_instance_disk "testvm" "20G" "testuser" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test"; then
     fail "instance creation unexpectedly succeeded without template image"
   fi
 
@@ -74,13 +74,11 @@ test_instance_creation_clones_resizes_and_writes_metadata() (
   }
   # Mock seed injection (requires root for loop mount in production)
   fc_image_create_instance_seed() {
-    printf '%s %s\n' "$1" "$2" > "$tmpdir/seed-inject.log"
+    printf '%s %s %s %s\n' "$1" "$2" "$3" "$4" > "$tmpdir/seed-inject.log"
     return 0
   }
 
-  printf '%s\n' '#cloud-config' 'users:' "  - name: $FC_GUEST_USER" '    sudo: ALL=(ALL) NOPASSWD:ALL' '    ssh_authorized_keys:' '      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForCreate user@test' > "$tmpdir/images/ubuntu-template-user-data.yaml"
-
-  fc_image_create_instance_disk "testvm" "20G" || return 1
+  fc_image_create_instance_disk "testvm" "20G" "testuser" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" || return 1
 
   [[ -f "$disk_path" ]] || fail "instance disk file was not created"
   [[ "$(<"$disk_path")" == "template-image" ]] || fail "instance disk was not cloned from template"
@@ -94,10 +92,10 @@ test_instance_creation_clones_resizes_and_writes_metadata() (
   [[ -f "$tmpdir/resize2fs.log" ]] || fail "resize2fs was not called to expand the filesystem"
   [[ "$(<"$tmpdir/resize2fs.log")" == "-f $disk_path" ]] || fail "resize2fs was not called with the correct arguments"
   [[ -f "$tmpdir/seed-inject.log" ]] || fail "seed injection was not called"
-  [[ "$(<"$tmpdir/seed-inject.log")" == "testvm $disk_path" ]] || fail "seed injection was not called with correct arguments"
+  [[ "$(<"$tmpdir/seed-inject.log")" == "testvm $disk_path testuser ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" ]] || fail "seed injection was not called with correct arguments"
 )
 
-test_fc_create_requires_disk_size_in_non_interactive_mode() (
+test_fc_create_requires_credentials_in_non_interactive_mode() (
   local output_file status
 
   output_file=$(mktemp)
@@ -106,8 +104,8 @@ test_fc_create_requires_disk_size_in_non_interactive_mode() (
   status=$?
   set -e
 
-  [[ "$status" -ne 0 ]] || fail "fc-create unexpectedly succeeded without --disk-size in non-interactive mode"
-  grep -q '^ERROR: --disk-size is required when stdin is not interactive$' "$output_file" || fail "fc-create did not report the required non-interactive disk-size error"
+  [[ "$status" -ne 0 ]] || fail "fc-create unexpectedly succeeded without credentials in non-interactive mode"
+  grep -q 'is required when stdin is not interactive' "$output_file" || fail "fc-create did not report the required non-interactive error"
 )
 
 test_fc_create_records_network_identity_metadata_without_live_ip_changes() (
@@ -147,10 +145,8 @@ test_fc_create_records_network_identity_metadata_without_live_ip_changes() (
 
   printf '%s\n' '#cloud-config' > "$tmpdir/images/ubuntu-template-user-data.yaml"
 
-  fc_image_create_instance_disk "testvm" "20G" || return 1
+  fc_image_create_instance_disk "testvm" "20G" "testuser" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" || return 1
   fc_network_prepare_instance_metadata "testvm" "$metadata_path" || return 1
-
-  [[ -f "$metadata_path" ]] || fail "vm metadata missing after fc-create"
   grep -q '^TAP_NAME=fc-testvm0$' "$metadata_path" || fail "metadata missing TAP_NAME"
   grep -q '^MAC_ADDRESS=02:18:8c:c0:a7:f8$' "$metadata_path" || fail "metadata missing stable MAC_ADDRESS"
   grep -q '^BRIDGE_NAME=vmbr0$' "$metadata_path" || fail "metadata missing BRIDGE_NAME"
@@ -225,9 +221,9 @@ EOF
 
   PATH="$tmpdir/bin:$PATH" \
     FC_RUNTIME_ROOT="$tmpdir/runtime" \
-    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G || return 1
+    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" || return 1
 
-  [[ "$(sed -n '1p' "$sudo_log")" == "-n $REPO_ROOT/bin/fc-create testvm --disk-size 20G" ]] || fail "fc-create did not re-exec through passwordless sudo for operator flow"
+  [[ "$(sed -n '1p' "$sudo_log")" == "-n $REPO_ROOT/bin/fc-create testvm --disk-size 20G --guest-user testuser --ssh-key ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" ]] || fail "fc-create did not re-exec through passwordless sudo for operator flow"
   [[ -f "$metadata_path" ]] || fail "fc-create did not create instance metadata after sudo re-exec"
 )
 
@@ -236,7 +232,7 @@ test_instance_seed_uses_template_cloud_init_content() (
 
   local tmpdir user_data_path meta_data_path disk_path mount_target
   tmpdir=$(mktemp -d)
-  mkdir -p "$tmpdir/images" "$tmpdir/vms/testvm"
+  mkdir -p "$tmpdir/images" "$tmpdir/vms/testvm" "$tmpdir/templates"
   user_data_path="$tmpdir/vms/testvm/user-data"
   meta_data_path="$tmpdir/vms/testvm/meta-data"
   disk_path="$tmpdir/vms/testvm/rootfs.raw"
@@ -248,8 +244,10 @@ test_instance_seed_uses_template_cloud_init_content() (
   fc_ok() { :; }
   fc_error() { :; }
   fc_vm_instances_dir() { printf '%s\n' "$tmpdir/vms"; }
-  fc_image_user_data_path() { printf '%s\n' "$tmpdir/images/ubuntu-template-user-data.yaml"; }
-  printf '%s\n' '#cloud-config' 'users:' "  - name: $FC_GUEST_USER" '    sudo: ALL=(ALL) NOPASSWD:ALL' '    ssh_authorized_keys:' '      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSeed user@test' > "$tmpdir/images/ubuntu-template-user-data.yaml"
+  fc_image_templates_dir() { printf '%s\n' "$tmpdir/templates"; }
+  # Place cloud-init templates with placeholder tokens
+  cp "$REPO_ROOT/templates/cloud-init-user-data.yaml" "$tmpdir/templates/"
+  cp "$REPO_ROOT/templates/cloud-init-meta-data.yaml" "$tmpdir/templates/"
 
   # Mock mktemp to return a predictable mount point
   mktemp() {
@@ -264,11 +262,11 @@ test_instance_seed_uses_template_cloud_init_content() (
   umount() { return 0; }
   rmdir() { return 0; }
 
-  fc_image_create_instance_seed "testvm" "$disk_path" || return 1
+  fc_image_create_instance_seed "testvm" "$disk_path" "seeduser" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSeed user@test" || return 1
 
   # Verify reference copies in the instance directory
   [[ -f "$user_data_path" ]] || fail "instance user-data reference copy missing"
-  grep -q "^  - name: ${FC_GUEST_USER}\$" "$user_data_path" || fail "instance user-data missing guest user"
+  grep -q '^  - name: seeduser$' "$user_data_path" || fail "instance user-data missing guest user"
   grep -qF 'sudo: ALL=(ALL) NOPASSWD:ALL' "$user_data_path" || fail "instance user-data missing passwordless sudo"
   grep -q 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSeed user@test' "$user_data_path" || fail "instance user-data missing ssh key"
   grep -q '^instance-id: testvm$' "$meta_data_path" || fail "instance meta-data missing instance-id"
@@ -277,7 +275,7 @@ test_instance_seed_uses_template_cloud_init_content() (
   # Verify seed files were injected into the (mocked) mount point
   [[ -f "$mount_target/var/lib/cloud/seed/nocloud/user-data" ]] || fail "seed user-data not injected into rootfs"
   [[ -f "$mount_target/var/lib/cloud/seed/nocloud/meta-data" ]] || fail "seed meta-data not injected into rootfs"
-  grep -q "^  - name: ${FC_GUEST_USER}\$" "$mount_target/var/lib/cloud/seed/nocloud/user-data" || fail "injected user-data missing guest user"
+  grep -q '^  - name: seeduser$' "$mount_target/var/lib/cloud/seed/nocloud/user-data" || fail "injected user-data missing guest user"
   grep -q '^instance-id: testvm$' "$mount_target/var/lib/cloud/seed/nocloud/meta-data" || fail "injected meta-data missing instance-id"
 )
 
@@ -301,7 +299,7 @@ test_instance_creation_rejects_vm_names_with_overlong_tap_names() (
   qemu-img() { return 0; }
   resize2fs() { return 0; }
 
-  if fc_image_create_instance_disk "$vm_name" "20G"; then
+  if fc_image_create_instance_disk "$vm_name" "20G" "testuser" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test"; then
     fail "instance creation unexpectedly accepted a VM name with an overlong tap name"
   fi
 
@@ -399,7 +397,7 @@ test_fc_create_writes_vcpu_and_memory_to_metadata() (
 
   printf '%s\n' '#cloud-config' > "$tmpdir/images/ubuntu-template-user-data.yaml"
 
-  fc_image_create_instance_disk "testvm" "20G" || return 1
+  fc_image_create_instance_disk "testvm" "20G" "testuser" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" || return 1
   fc_network_prepare_instance_metadata "testvm" "$metadata_path" || return 1
 
   # Simulate what fc-create does: append compute metadata
@@ -458,7 +456,7 @@ EOF
   set +e
   PATH="$tmpdir/bin:$PATH" \
     FC_RUNTIME_ROOT="$tmpdir/runtime" \
-    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G > "$output_file" 2>&1
+    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" > "$output_file" 2>&1
   status=$?
   set -e
 
@@ -474,7 +472,7 @@ test_fc_create_rejects_invalid_vcpu_values() (
   # Test --vcpus 0
   output_file=$(mktemp)
   set +e
-  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --vcpus 0 < /dev/null > "$output_file" 2>&1
+  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --vcpus 0 < /dev/null > "$output_file" 2>&1
   status=$?
   set -e
   [[ "$status" -ne 0 ]] || fail "fc-create should reject --vcpus 0"
@@ -482,7 +480,7 @@ test_fc_create_rejects_invalid_vcpu_values() (
   # Test --vcpus abc
   output_file=$(mktemp)
   set +e
-  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --vcpus abc < /dev/null > "$output_file" 2>&1
+  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --vcpus abc < /dev/null > "$output_file" 2>&1
   status=$?
   set -e
   [[ "$status" -ne 0 ]] || fail "fc-create should reject --vcpus abc"
@@ -493,7 +491,7 @@ test_fc_create_rejects_memory_below_minimum() (
 
   output_file=$(mktemp)
   set +e
-  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --memory 64m < /dev/null > "$output_file" 2>&1
+  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --memory 64m < /dev/null > "$output_file" 2>&1
   status=$?
   set -e
   [[ "$status" -ne 0 ]] || fail "fc-create should reject --memory 64m (below 128 MiB minimum)"
@@ -545,7 +543,7 @@ EOF
   set +e
   PATH="$tmpdir/bin:$PATH" \
     FC_RUNTIME_ROOT="$tmpdir/runtime" \
-    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --memory 2g > "$output_file" 2>&1
+    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --memory 2g > "$output_file" 2>&1
   status=$?
   set -e
 
@@ -612,7 +610,7 @@ main() {
   test_instance_creation_requires_existing_template || return 1
   test_instance_creation_clones_resizes_and_writes_metadata || return 1
   test_instance_creation_rejects_vm_names_with_overlong_tap_names || return 1
-  test_fc_create_requires_disk_size_in_non_interactive_mode || return 1
+  test_fc_create_requires_credentials_in_non_interactive_mode || return 1
   test_fc_create_records_network_identity_metadata_without_live_ip_changes || return 1
   test_fc_create_reexecs_with_sudo_for_operator_flow || return 1
   test_instance_seed_uses_template_cloud_init_content || return 1

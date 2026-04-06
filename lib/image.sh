@@ -126,11 +126,12 @@ fc_image_apply_template() {
 fc_image_render_user_data() {
   local ssh_public_key=$1
   local output_path=$2
+  local guest_user=${3:-$FC_GUEST_USER}
 
   fc_image_apply_template \
     "$(fc_image_templates_dir)/cloud-init-user-data.yaml" \
     "$output_path" \
-    "__FC_GUEST_USER__" "$FC_GUEST_USER" \
+    "__FC_GUEST_USER__" "$guest_user" \
     "__FC_SSH_AUTHORIZED_KEY__" "$ssh_public_key"
 }
 
@@ -360,19 +361,15 @@ fc_image_template_user_data_path() {
 fc_image_create_instance_seed() {
   local vm_name=$1
   local disk_path=$2
-  local template_user_data_path user_data_path meta_data_path mount_dir
+  local guest_user=$3
+  local ssh_public_key=$4
+  local user_data_path meta_data_path mount_dir
 
-  template_user_data_path=$(fc_image_expand_path "$(fc_image_template_user_data_path)") || return 1
   user_data_path=$(fc_image_instance_user_data_path "$vm_name")
   meta_data_path=$(fc_image_instance_meta_data_path "$vm_name")
 
-  [[ -f "$template_user_data_path" ]] || {
-    fc_error "template user-data not found: $template_user_data_path"
-    return 1
-  }
-
-  # Keep copies in the instance dir for reference / debugging
-  cp -- "$template_user_data_path" "$user_data_path" || return 1
+  # Render user-data from the YAML template with per-VM credentials
+  fc_image_render_user_data "$ssh_public_key" "$user_data_path" "$guest_user" || return 1
   fc_image_render_meta_data "$vm_name" "$vm_name" "$meta_data_path" || return 1
 
   # Inject cloud-init seed directly into the rootfs so the NoCloud
@@ -484,6 +481,8 @@ fc_image_resize_instance_disk() {
 fc_image_create_instance_disk() {
   local vm_name=$1
   local disk_size=$2
+  local guest_user=$3
+  local ssh_public_key=$4
   local template_path
   local instance_dir
   local disk_path
@@ -524,7 +523,7 @@ fc_image_create_instance_disk() {
     return 1
   fi
 
-  if ! fc_image_create_instance_seed "$vm_name" "$disk_path"; then
+  if ! fc_image_create_instance_seed "$vm_name" "$disk_path" "$guest_user" "$ssh_public_key"; then
     rm -rf "$instance_dir"
     return 1
   fi

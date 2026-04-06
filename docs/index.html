@@ -366,7 +366,7 @@
 
     <div class="terminal">
       <pre><span class="comment"># 1. Create a sandbox VM with 2 vCPUs and 2GB RAM</span>
-<span class="cmd">fc-create</span> <span class="arg">openclaw-sandbox</span> <span class="flag">--disk-size 30G --vcpus 2 --memory 2g</span>
+<span class="cmd">fc-create</span> <span class="arg">openclaw-sandbox</span> <span class="flag">--guest-user ops --ssh-key-file ~/.ssh/id_ed25519.pub --disk-size 30G --vcpus 2 --memory 2g</span>
 
 <span class="comment"># 2. Start the sandbox</span>
 <span class="cmd">fc-start</span> <span class="arg">openclaw-sandbox</span>
@@ -454,7 +454,12 @@
         <div class="step-content">
           <h3>Create &amp; Start a VM</h3>
           <div class="terminal">
-            <pre><span class="cmd">fc-create</span> <span class="arg">myvm</span> <span class="flag">--disk-size 20G --vcpus 2 --memory 2g</span>
+            <pre><span class="comment"># Interactive — prompts for username, SSH key, and disk size:</span>
+<span class="cmd">fc-create</span> <span class="arg">myvm</span>
+
+<span class="comment"># Or provide everything on the command line:</span>
+<span class="cmd">fc-create</span> <span class="arg">myvm</span> <span class="flag">--guest-user ops --ssh-key-file ~/.ssh/id_ed25519.pub --disk-size 20G</span>
+
 <span class="cmd">fc-start</span> <span class="arg">myvm</span></pre>
           </div>
         </div>

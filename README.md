@@ -73,8 +73,11 @@ curl -fsSL https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/in
 # 1. Build the Ubuntu template image
 sudo bash -c 'source /opt/firecracker-farm/lib/image.sh && fc_image_build_template'
 
-# 2. Create a VM instance (optionally set vCPUs and memory)
-fc-create myvm --disk-size 20G --vcpus 2 --memory 2g
+# 2. Create a VM instance (interactive — prompts for username, SSH key, and disk size)
+fc-create myvm
+
+# Or provide everything on the command line:
+fc-create myvm --guest-user ops --ssh-key-file ~/.ssh/id_ed25519.pub --disk-size 20G --vcpus 2 --memory 2g
 
 # 3. Start it (installs systemd unit, enables and starts the service)
 fc-start myvm
@@ -98,7 +101,7 @@ fc-stop myvm
 |---------|-------------|
 | `fc-install-host` | Install host prerequisites, Firecracker binaries, guest kernel, and write host config |
 | `fc-install-host --preflight` | Read-only host readiness check |
-| `fc-create <name>` | Create a persistent VM instance (`--disk-size`, `--vcpus`, `--memory`) |
+| `fc-create <name>` | Create a persistent VM instance (`--guest-user`, `--ssh-key-file`, `--disk-size`, `--vcpus`, `--memory`) |
 | `fc-start <name>` | Start a VM (via systemd) |
 | `fc-stop <name>` | Stop a VM (via systemd); supports `--force` for SIGKILL |
 | `fc-status <name>` | Show detailed VM status (vCPUs, memory, disk, IP, uptime) |
@@ -109,7 +112,11 @@ All commands that require root re-exec themselves through passwordless `sudo` wh
 
 Run any command with `-h` or `--help` for usage details.
 
-The first run of `fc-install-host` captures the operator's username and SSH key path into `/var/lib/firecracker/host.env`. All subsequent commands read this file automatically.
+### VM credentials
+
+Each VM requires a **guest username** and **SSH public key**. These are injected into the VM via cloud-init at creation time.
+
+When running interactively, `fc-create` prompts for both if not provided via flags. When running non-interactively (e.g. piped or scripted), both `--guest-user` and either `--ssh-key-file` or `--ssh-key` must be specified on the command line.
 
 ## Requirements
 
