@@ -12,11 +12,11 @@ readonly FC_FARM_REPO="linuxdevel/firecracker-farm"
 readonly FC_FARM_INSTALL_DIR="/opt/firecracker-farm"
 readonly FC_FARM_BIN_LINK_DIR="/usr/local/bin"
 
-log()   { printf '%s\n' "$*"; }
+log()   { printf '%s\n' "$*" >&2; }
 info()  { log "INFO: $*"; }
-error() { log "ERROR: $*" >&2; }
+error() { log "ERROR: $*"; }
 ok()    { log "PASS: $*"; }
-warn()  { log "WARN: $*" >&2; }
+warn()  { log "WARN: $*"; }
 
 usage() {
   cat <<EOF
