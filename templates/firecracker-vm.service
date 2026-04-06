@@ -5,13 +5,13 @@ Wants=network-online.target
 ConditionPathExists={{FC_RUNTIME_ROOT}}/vms/%i/vm.env
 
 [Service]
-Type=forking
-PIDFile={{FC_RUNTIME_ROOT}}/vms/%i/runtime/firecracker.pid
+Type=simple
 WorkingDirectory={{FC_CONTROL_ROOT}}
 ExecStart={{FC_CONTROL_ROOT}}/bin/fc-start --direct %i
-ExecStop={{FC_CONTROL_ROOT}}/bin/fc-stop --direct %i
-GuessMainPID=no
-KillMode=none
+ExecStopPost={{FC_CONTROL_ROOT}}/bin/fc-stop --direct %i
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target

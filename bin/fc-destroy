@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+# shellcheck source=../lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+# shellcheck source=../lib/firecracker.sh
+source "$SCRIPT_DIR/../lib/firecracker.sh"
+fc_load_config
+
+fc_destroy_usage() {
+  cat >&2 <<EOF
+Usage: fc-destroy <name> [--yes]
+
+Permanently destroys a Firecracker VM and all its data (rootfs, metadata,
+runtime state, and logs). This action cannot be undone.
+
+If the VM is running, it is stopped first.
+
+Options:
+  --yes        Skip confirmation prompt (for scripted use).
+  -h, --help   Show this help text.
+
+Examples:
+  fc-destroy myvm
+  fc-destroy myvm --yes
+EOF
+}
+
+fc_destroy_main() {
+  local vm_name=
+  local skip_confirm=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --yes)
+        skip_confirm=1
+        shift
+        ;;
+      -h|--help)
+        fc_destroy_usage
+        return 0
+        ;;
+      --*)
+        fc_error "Unknown option: $1"
+        fc_destroy_usage
+        return 1
+        ;;
+      *)
+        if [[ -n "$vm_name" ]]; then
+          fc_error "unexpected positional argument: $1"
+          fc_destroy_usage
+          return 1
+        fi
+        vm_name=$1
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$vm_name" ]]; then
+    fc_error "VM name is required"
+    fc_destroy_usage
+    return 1
+  fi
+
+  # Sudo re-exec (before any work)
+  if ! fc_running_as_root; then
+    if (( skip_confirm )); then
+      fc_reexec_with_sudo "$0" "$vm_name" --yes
+    else
+      fc_reexec_with_sudo "$0" "$vm_name"
+    fi
+  fi
+
+  local instance_dir
+  instance_dir=$(fc_firecracker_vm_dir "$vm_name")
+
+  if [[ ! -d "$instance_dir" ]]; then
+    fc_error "VM not found: $vm_name (no instance directory at $instance_dir)"
+    return 1
+  fi
+
+  local metadata_path
+  metadata_path=$(fc_firecracker_vm_metadata_path "$vm_name")
+
+  # Show what will be destroyed
+  local disk_path disk_size_human
+  disk_path="$instance_dir/rootfs.raw"
+  if [[ -f "$disk_path" ]]; then
+    disk_size_human=$(du -h "$disk_path" 2>/dev/null | cut -f1)
+  else
+    disk_size_human="(no rootfs)"
+  fi
+
+  local runtime_dir log_stdout log_stderr
+  runtime_dir=$(fc_firecracker_runtime_dir "$vm_name")
+  log_stdout=$(fc_firecracker_stdout_log_path "$vm_name")
+  log_stderr=$(fc_firecracker_stderr_log_path "$vm_name")
+
+  printf '\n' >&2
+  printf '  WARNING: This will permanently destroy VM "%s"\n' "$vm_name" >&2
+  printf '\n' >&2
+  printf '  Instance dir : %s\n' "$instance_dir" >&2
+  printf '  Rootfs disk  : %s (%s on disk)\n' "$disk_path" "$disk_size_human" >&2
+  printf '  Runtime dir  : %s\n' "$runtime_dir" >&2
+  printf '  Log files    : %s, %s\n' "$log_stdout" "$log_stderr" >&2
+  printf '\n' >&2
+  printf '  This action cannot be undone.\n' >&2
+  printf '\n' >&2
+
+  if (( ! skip_confirm )); then
+    if [[ ! -t 0 ]]; then
+      fc_error "confirmation required: pass --yes to skip, or run interactively"
+      return 1
+    fi
+    local response=
+    printf 'Type "yes" to confirm destruction of VM %s: ' "$vm_name" >&2
+    IFS= read -r response || return 1
+    if [[ "$response" != "yes" ]]; then
+      fc_info "Aborted."
+      return 1
+    fi
+  fi
+
+  # Stop VM if running
+  local pid_path
+  pid_path=$(fc_firecracker_pid_path "$vm_name")
+
+  if [[ -f "$pid_path" ]]; then
+    local pid
+    pid=$(<"$pid_path")
+    if fc_firecracker_pid_is_safe "$pid" && fc_process_is_running "$pid"; then
+      fc_info "Stopping running VM $vm_name..."
+      fc_firecracker_stop "$vm_name" 0 || {
+        fc_warn "graceful stop failed, force-stopping..."
+        fc_firecracker_stop "$vm_name" 1 || true
+      }
+    fi
+  fi
+
+  # Disable systemd unit if enabled
+  local unit_name="firecracker@${vm_name}.service"
+  if systemctl is-enabled "$unit_name" >/dev/null 2>&1; then
+    systemctl disable "$unit_name" 2>/dev/null || true
+  fi
+
+  # Remove tap device if it still exists
+  if [[ -f "$metadata_path" ]]; then
+    local tap_name
+    tap_name=$(fc_firecracker_env_get "$metadata_path" "TAP_NAME")
+    if [[ -n "$tap_name" ]] && fc_firecracker_tap_name_is_managed "$tap_name"; then
+      if fc_network_tap_exists "$tap_name"; then
+        fc_network_delete_tap "$tap_name" || true
+      fi
+    fi
+  fi
+
+  # Remove instance directory (rootfs, user-data, meta-data, vm.env, etc.)
+  rm -rf "$instance_dir"
+
+  # Remove runtime directory (jailer root, pid files, state)
+  if [[ -d "$runtime_dir" ]]; then
+    rm -rf "$runtime_dir"
+  fi
+
+  # Remove log files
+  rm -f "$log_stdout" "$log_stderr"
+
+  fc_ok "Destroyed VM $vm_name"
+}
+
+fc_destroy_main "$@"

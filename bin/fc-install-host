@@ -9,6 +9,7 @@ fc_load_config
 readonly FC_FIRECRACKER_REPO="firecracker-microvm/firecracker"
 readonly FC_DEFAULT_FIRECRACKER_VERSION="latest"
 readonly FC_FIRECRACKER_CI_KERNEL_BUCKET="https://s3.amazonaws.com/spec.ccfc.min"
+readonly FC_JAILER_USER="firecracker"
 readonly FC_REQUIRED_PACKAGES=(
   curl
   jq
@@ -234,6 +235,33 @@ fc_install_missing_packages() {
   fc_warn "Skipping optional host packages unless explicitly installed: ${optional_packages[*]}"
 }
 
+fc_ensure_jailer_user() {
+  if id "$FC_JAILER_USER" >/dev/null 2>&1; then
+    fc_ok "System user '$FC_JAILER_USER' already exists (uid=$(id -u "$FC_JAILER_USER"))"
+    return 0
+  fi
+
+  fc_info "Creating dedicated system user '$FC_JAILER_USER' for Firecracker jailer"
+  fc_sudo useradd \
+    --system \
+    --no-create-home \
+    --shell /usr/sbin/nologin \
+    --comment "Firecracker VM jailer" \
+    "$FC_JAILER_USER" || {
+      fc_error "failed to create system user '$FC_JAILER_USER'"
+      return 1
+    }
+  fc_ok "Created system user '$FC_JAILER_USER' (uid=$(id -u "$FC_JAILER_USER"))"
+}
+
+fc_jailer_uid() {
+  id -u "$FC_JAILER_USER"
+}
+
+fc_jailer_gid() {
+  id -g "$FC_JAILER_USER"
+}
+
 fc_ensure_directories() {
   fc_info "Ensuring dedicated Firecracker directories exist"
   fc_sudo install -d -m 0755 "$FC_RUNTIME_ROOT"
@@ -398,6 +426,7 @@ fc_run_install() {
   fc_require_install_command "sha256sum is available" sha256sum
 
   fc_install_missing_packages
+  fc_ensure_jailer_user
   fc_ensure_directories
 
   version=$(fc_resolve_firecracker_version)
@@ -435,12 +464,18 @@ fc_detect_ssh_key_file() {
 fc_write_host_env() {
   local guest_user=$1
   local ssh_key_file=$2
+  local jailer_uid=$3
+  local jailer_gid=$4
   local host_env_path="${FC_RUNTIME_ROOT}/host.env"
 
   cat > "$host_env_path" <<EOF
 # Written by fc-install-host on $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# FC_GUEST_USER / FC_SSH_KEY_FILE: defaults for template builds.
+# fc-create requires per-VM credentials via flags or interactive prompts.
 FC_GUEST_USER=$guest_user
 FC_SSH_KEY_FILE=$ssh_key_file
+FC_JAILER_UID=$jailer_uid
+FC_JAILER_GID=$jailer_gid
 EOF
   fc_ok "Wrote host configuration to $host_env_path"
 }
@@ -499,7 +534,7 @@ main() {
         return 1
       fi
       fc_run_install
-      fc_write_host_env "$guest_user" "$ssh_key_file"
+      fc_write_host_env "$guest_user" "$ssh_key_file" "$(fc_jailer_uid)" "$(fc_jailer_gid)"
       ;;
   esac
 }

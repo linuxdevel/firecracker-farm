@@ -114,8 +114,9 @@ fc_start_main() {
   fi
 
   if (( direct )); then
-    fc_firecracker_start "$1"
-    return 0
+    fc_firecracker_start_exec "$1"
+    # fc_firecracker_start_exec uses exec — this line only reached on failure
+    return 1
   fi
 
   fc_start_install_systemd_unit || return 1

@@ -151,6 +151,14 @@
         <h3>One-Command Install</h3>
         <p><code>curl | sudo bash</code> installs everything: farm tools, Firecracker binaries, guest kernel, and host config.</p>
       </div>
+
+      <div class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <h3>Unprivileged Jailer</h3>
+        <p>Firecracker runs as a dedicated system user (UID 999), not root. The jailer drops privileges before exec, limiting blast radius.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -247,7 +255,7 @@
 <section id="architecture">
   <div class="container">
     <h2 class="section-title">Architecture</h2>
-    <p class="section-subtitle">Each VM runs in its own jailer sandbox with KVM isolation, connected to your LAN via tap devices.</p>
+    <p class="section-subtitle">Each VM runs in its own jailer sandbox as an unprivileged user with KVM isolation, connected to your LAN via tap devices.</p>
 
     <div class="arch-container">
       <svg width="720" height="440" viewBox="0 0 720 440" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -472,6 +480,19 @@
           <div class="terminal">
             <pre><span class="comment"># Wait ~30s for cloud-init + DHCP, then:</span>
 <span class="cmd">fc-ssh</span> <span class="arg">myvm</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="quickstart-step">
+        <div class="step-number">5</div>
+        <div class="step-content">
+          <h3>Manage</h3>
+          <div class="terminal">
+            <pre><span class="cmd">fc-list</span>                            <span class="comment"># List all VMs with status, IP, uptime</span>
+<span class="cmd">fc-status</span> <span class="arg">myvm</span>                     <span class="comment"># Detailed VM info</span>
+<span class="cmd">fc-stop</span> <span class="arg">myvm</span>                       <span class="comment"># Stop the VM</span>
+<span class="cmd">fc-destroy</span> <span class="arg">myvm</span> <span class="flag">--yes</span>             <span class="comment"># Permanently remove VM, disk, and logs</span></pre>
           </div>
         </div>
       </div>

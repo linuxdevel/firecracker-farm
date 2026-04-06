@@ -143,14 +143,31 @@ fc_network_prepare_instance_metadata() {
   fc_network_write_instance_metadata "$metadata_path" "$tap_name" "$mac_address" "$bridge_name"
 }
 
+fc_network_resolve_guest_ip_from_neigh() {
+    local mac_address=$1
+    local bridge_name=$2
+
+    # Collect all IPs for this MAC, prefer IPv4 (contains '.') over
+    # link-local IPv6 (contains ':').
+    ip neigh show dev "$bridge_name" 2>/dev/null \
+        | awk -v mac="$mac_address" '
+            tolower($0) ~ tolower(mac) && /REACHABLE|STALE|DELAY|PROBE/ {
+                if ($1 ~ /\./) { ipv4 = $1 }
+                else if (ipv6 == "") { ipv6 = $1 }
+            }
+            END {
+                if (ipv4 != "") print ipv4
+                else if (ipv6 != "") print ipv6
+            }'
+}
+
 fc_network_resolve_guest_ip() {
     local mac_address=$1
     local bridge_name=${2:-$FC_DEFAULT_BRIDGE}
     local ip
 
     # Check ARP/neighbor table for this MAC
-    ip=$(ip neigh show dev "$bridge_name" 2>/dev/null \
-        | awk -v mac="$mac_address" 'tolower($0) ~ tolower(mac) && /REACHABLE|STALE|DELAY|PROBE/ { print $1; exit }')
+    ip=$(fc_network_resolve_guest_ip_from_neigh "$mac_address" "$bridge_name")
 
     if [[ -n "$ip" ]]; then
         printf '%s\n' "$ip"
@@ -161,8 +178,7 @@ fc_network_resolve_guest_ip() {
     if command -v arping >/dev/null 2>&1; then
         arping -c 1 -w 1 -I "$bridge_name" -D 255.255.255.255 >/dev/null 2>&1 || true
         sleep 0.3
-        ip=$(ip neigh show dev "$bridge_name" 2>/dev/null \
-            | awk -v mac="$mac_address" 'tolower($0) ~ tolower(mac) && /REACHABLE|STALE|DELAY|PROBE/ { print $1; exit }')
+        ip=$(fc_network_resolve_guest_ip_from_neigh "$mac_address" "$bridge_name")
         if [[ -n "$ip" ]]; then
             printf '%s\n' "$ip"
             return 0

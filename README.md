@@ -93,6 +93,9 @@ fc-list
 
 # 7. Stop it
 fc-stop myvm
+
+# 8. Destroy it (permanently removes disk, runtime, and logs)
+fc-destroy myvm --yes
 ```
 
 ## Commands
@@ -104,6 +107,7 @@ fc-stop myvm
 | `fc-create <name>` | Create a persistent VM instance (`--guest-user`, `--ssh-key-file`, `--disk-size`, `--vcpus`, `--memory`) |
 | `fc-start <name>` | Start a VM (via systemd) |
 | `fc-stop <name>` | Stop a VM (via systemd); supports `--force` for SIGKILL |
+| `fc-destroy <name>` | Permanently remove a VM instance, its disk, runtime state, and logs |
 | `fc-status <name>` | Show detailed VM status (vCPUs, memory, disk, IP, uptime) |
 | `fc-list` | List all VMs in a formatted table |
 | `fc-ssh <name>` | SSH into a running VM (auto-resolves IP from MAC) |
@@ -173,17 +177,33 @@ The template pipeline downloads an official Ubuntu cloud image, converts it to r
 
 ### VM launch
 
-`fc-start` installs a systemd template unit (`firecracker@.service`), syncs a stable copy of the control scripts into `/var/lib/firecracker/control/`, and enables the instance service. The service calls back into `fc-start --direct <name>` which:
+`fc-start` installs a systemd template unit (`firecracker@.service`), syncs a stable copy of the control scripts into `/var/lib/firecracker/control/`, and enables the instance service. The service uses `Type=simple` and `KillMode=control-group`, so systemd tracks the Firecracker process directly and can cleanly stop it. The `fc-start --direct <name>` handler:
 
 1. Creates a tap device and attaches it to the bridge
 2. Renders the Firecracker JSON config from metadata
 3. Hard-links the persistent rootfs into the jailer chroot (writes survive restarts)
-4. Launches Firecracker via jailer with bounded log capture
-5. Records PID and runtime state
+4. Transfers ownership of the rootfs to the jailer user
+5. Execs into the jailer, which drops privileges and starts Firecracker in the foreground
+
+### Security
+
+The jailer runs Firecracker as a dedicated unprivileged system user (`firecracker`, UID 999) created by `fc-install-host`. This limits the blast radius if the VMM is compromised -- the process has no access to host files outside its chroot. The UID/GID are recorded in `host.env` as `FC_JAILER_UID`/`FC_JAILER_GID`.
 
 ### Networking
 
-Each VM gets a deterministic tap name (`fc-<name>0`) and a stable locally-administered MAC address derived from the instance name. The tap is bridged to `vmbr0`. Inside the guest, cloud-init configures netplan with DHCP on the matching MAC.
+Each VM gets a deterministic tap name (`fc-<name>0`) and a stable locally-administered MAC address derived from the instance name. The tap is bridged to `vmbr0`. Inside the guest, cloud-init configures netplan with DHCP on all Ethernet interfaces via an injected `network-config` file (netplan v2). The host resolves guest IPs from the ARP/neighbor table, preferring IPv4 over link-local IPv6.
+
+### Instance destruction
+
+`fc-destroy` permanently removes a VM and all its resources:
+
+1. Stops the VM if running (via systemd, then direct signal)
+2. Removes the instance directory (`/var/lib/firecracker/vms/<name>/`)
+3. Removes the runtime directory (jailer chroot, PID file, state)
+4. Cleans up the tap device
+5. Removes log files
+
+Requires `--yes` or interactive confirmation to prevent accidents.
 
 ## Tests
 
@@ -194,7 +214,7 @@ for t in tests/*.sh; do bash "$t" || exit 1; done
 
 Test suites:
 - `tests/image-build.sh` — template build pipeline
-- `tests/create-instance.sh` — instance disk creation, seed injection, networking, IP resolution
+- `tests/create-instance.sh` — instance disk creation, seed injection, networking, IP resolution, fc-destroy
 - `tests/runtime-lifecycle.sh` — config rendering, start/stop, tap management, log bounding, SIGKILL escalation
 - `tests/systemd-lifecycle.sh` — systemd unit install, operator sudo re-exec
 - `tests/install-host.sh` — host package install, binary provisioning
@@ -205,7 +225,7 @@ Test suites:
 - Never modifies existing Proxmox VMs, storage pools, bridges, or firewall rules
 - Never modifies `/etc/network/interfaces`
 - All Firecracker assets are kept under dedicated paths (`/var/lib/firecracker`, `/opt/firecracker`)
-- No destructive delete/cleanup commands in v1
+- No destructive delete/cleanup commands without explicit confirmation (`fc-destroy` requires `--yes` or interactive prompt)
 - Input validation rejects invalid VM names, overlong tap names, unsafe PID/tap values
 
 ## Roadmap

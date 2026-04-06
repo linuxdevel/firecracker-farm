@@ -59,12 +59,22 @@ test_host_install_provisions_firecracker_binaries_and_kernel() (
   cat > "$stub_dir/id" <<'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == '-u' ]]; then
-  printf '0\n'
+  if [[ "${2:-}" == 'firecracker' ]]; then printf '999\n'; else printf '0\n'; fi
+elif [[ "${1:-}" == '-g' && "${2:-}" == 'firecracker' ]]; then
+  printf '997\n'
+elif [[ "${1:-}" == 'firecracker' ]]; then
+  printf 'uid=999(firecracker) gid=997(firecracker) groups=997(firecracker)\n'
 else
   /usr/bin/id "$@"
 fi
 EOF
   chmod +x "$stub_dir/id"
+
+  cat > "$stub_dir/useradd" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$stub_dir/useradd"
 
   cat > "$stub_dir/dpkg" <<'EOF'
 #!/usr/bin/env bash
@@ -171,6 +181,8 @@ EOF
   [[ -f "$runtime_root/host.env" ]] || fail "host install did not write host.env"
   grep -q '^FC_GUEST_USER=' "$runtime_root/host.env" || fail "host.env missing FC_GUEST_USER"
   grep -q '^FC_SSH_KEY_FILE=' "$runtime_root/host.env" || fail "host.env missing FC_SSH_KEY_FILE"
+  grep -q '^FC_JAILER_UID=999$' "$runtime_root/host.env" || fail "host.env missing FC_JAILER_UID=999"
+  grep -q '^FC_JAILER_GID=997$' "$runtime_root/host.env" || fail "host.env missing FC_JAILER_GID=997"
 )
 
 test_host_install_avoids_qemu_package_replacement_when_qemu_img_exists() (
@@ -192,12 +204,22 @@ test_host_install_avoids_qemu_package_replacement_when_qemu_img_exists() (
   cat > "$stub_dir/id" <<'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == '-u' ]]; then
-  printf '0\n'
+  if [[ "${2:-}" == 'firecracker' ]]; then printf '999\n'; else printf '0\n'; fi
+elif [[ "${1:-}" == '-g' && "${2:-}" == 'firecracker' ]]; then
+  printf '997\n'
+elif [[ "${1:-}" == 'firecracker' ]]; then
+  printf 'uid=999(firecracker) gid=997(firecracker) groups=997(firecracker)\n'
 else
   /usr/bin/id "$@"
 fi
 EOF
   chmod +x "$stub_dir/id"
+
+  cat > "$stub_dir/useradd" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$stub_dir/useradd"
 
   cat > "$stub_dir/dpkg" <<'EOF'
 #!/usr/bin/env bash

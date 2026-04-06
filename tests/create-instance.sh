@@ -614,6 +614,49 @@ test_network_resolve_guest_ip_finds_mac_in_neighbor_table() (
     [[ "$result" == "192.168.1.107" ]] || fail "resolve_guest_ip returned '$result' instead of 192.168.1.107"
 )
 
+test_network_resolve_guest_ip_prefers_ipv4_over_ipv6_link_local() (
+    source "$REPO_ROOT/lib/network.sh"
+
+    fc_info() { :; }
+    fc_warn() { :; }
+    fc_ok() { :; }
+    fc_error() { :; }
+
+    ip() {
+        if [[ "$1" == "neigh" && "$2" == "show" ]]; then
+            printf 'fe80::4b:6aff:fe05:b260 dev vmbr0 lladdr 02:4b:6a:05:b2:60 STALE\n'
+            printf '10.99.99.113 dev vmbr0 lladdr 02:4b:6a:05:b2:60 REACHABLE\n'
+            return 0
+        fi
+        return 1
+    }
+
+    local result
+    result=$(fc_network_resolve_guest_ip "02:4b:6a:05:b2:60" "vmbr0") || fail "resolve_guest_ip failed when both IPv4 and IPv6 present"
+    [[ "$result" == "10.99.99.113" ]] || fail "resolve_guest_ip returned '$result' instead of 10.99.99.113 (should prefer IPv4)"
+)
+
+test_network_resolve_guest_ip_falls_back_to_ipv6_when_no_ipv4() (
+    source "$REPO_ROOT/lib/network.sh"
+
+    fc_info() { :; }
+    fc_warn() { :; }
+    fc_ok() { :; }
+    fc_error() { :; }
+
+    ip() {
+        if [[ "$1" == "neigh" && "$2" == "show" ]]; then
+            printf 'fe80::f7:2fff:fe9c:ccc3 dev vmbr0 lladdr 02:f7:2f:9c:cc:c3 STALE\n'
+            return 0
+        fi
+        return 1
+    }
+
+    local result
+    result=$(fc_network_resolve_guest_ip "02:f7:2f:9c:cc:c3" "vmbr0") || fail "resolve_guest_ip failed for IPv6-only MAC"
+    [[ "$result" == "fe80::f7:2fff:fe9c:ccc3" ]] || fail "resolve_guest_ip returned '$result' instead of fe80::f7:2fff:fe9c:ccc3"
+)
+
 test_network_resolve_guest_ip_returns_failure_for_unknown_mac() (
     source "$REPO_ROOT/lib/network.sh"
 
@@ -645,6 +688,138 @@ test_format_uptime_formats_seconds_correctly() (
     [[ "$(fc_format_uptime 0)" == "0m" ]] || fail "uptime 0s did not format as 0m"
 )
 
+test_fc_destroy_requires_vm_name() (
+  local tmpdir output_file status
+
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/bin"
+  cat > "$tmpdir/bin/id" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-u' ]]; then printf '0\n'; else /usr/bin/id "$@"; fi
+EOF
+  chmod +x "$tmpdir/bin/id"
+
+  output_file=$(mktemp)
+  set +e
+  PATH="$tmpdir/bin:$PATH" \
+    bash "$REPO_ROOT/bin/fc-destroy" < /dev/null >"$output_file" 2>&1
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "fc-destroy should fail without a VM name"
+  grep -q 'VM name is required' "$output_file" || fail "fc-destroy missing VM name error message"
+)
+
+test_fc_destroy_fails_for_nonexistent_vm() (
+  local tmpdir output_file status
+
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/bin"
+  cat > "$tmpdir/bin/id" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-u' ]]; then printf '0\n'; else /usr/bin/id "$@"; fi
+EOF
+  chmod +x "$tmpdir/bin/id"
+
+  output_file=$(mktemp)
+  set +e
+  PATH="$tmpdir/bin:$PATH" \
+    FC_RUNTIME_ROOT="$tmpdir/runtime" \
+    bash "$REPO_ROOT/bin/fc-destroy" nosuchvm --yes < /dev/null >"$output_file" 2>&1
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "fc-destroy should fail for nonexistent VM"
+  grep -q 'VM not found' "$output_file" || fail "fc-destroy missing VM not found error message"
+)
+
+test_fc_destroy_requires_confirmation_non_interactive() (
+  local tmpdir output_file status
+
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/runtime/vms/testvm" "$tmpdir/bin"
+  printf 'template-image' > "$tmpdir/runtime/vms/testvm/rootfs.raw"
+  cat > "$tmpdir/runtime/vms/testvm/vm.env" <<'EOF'
+VM_NAME=testvm
+TAP_NAME=fc-testvm0
+EOF
+
+  cat > "$tmpdir/bin/id" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-u' ]]; then printf '0\n'; else /usr/bin/id "$@"; fi
+EOF
+  chmod +x "$tmpdir/bin/id"
+
+  # Stubs for commands fc-destroy might call
+  cat > "$tmpdir/bin/systemctl" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+  chmod +x "$tmpdir/bin/systemctl"
+
+  output_file=$(mktemp)
+  set +e
+  PATH="$tmpdir/bin:$PATH" \
+    FC_RUNTIME_ROOT="$tmpdir/runtime" \
+    bash "$REPO_ROOT/bin/fc-destroy" testvm < /dev/null >"$output_file" 2>&1
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "fc-destroy should fail without --yes in non-interactive mode"
+  grep -q 'confirmation required' "$output_file" || fail "fc-destroy missing confirmation required message"
+  [[ -d "$tmpdir/runtime/vms/testvm" ]] || fail "fc-destroy should not remove instance dir without confirmation"
+)
+
+test_fc_destroy_removes_instance_with_yes_flag() (
+  local tmpdir output_file status
+
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/runtime/vms/testvm" "$tmpdir/bin" "$tmpdir/log"
+  printf 'template-image' > "$tmpdir/runtime/vms/testvm/rootfs.raw"
+  cat > "$tmpdir/runtime/vms/testvm/vm.env" <<'EOF'
+VM_NAME=testvm
+TAP_NAME=fc-testvm0
+MAC_ADDRESS=02:18:8c:c0:a7:f8
+BRIDGE_NAME=vmbr0
+EOF
+  printf 'stdout log' > "$tmpdir/log/testvm.stdout.log"
+  printf 'stderr log' > "$tmpdir/log/testvm.stderr.log"
+
+  cat > "$tmpdir/bin/id" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-u' ]]; then printf '0\n'; else /usr/bin/id "$@"; fi
+EOF
+  chmod +x "$tmpdir/bin/id"
+
+  cat > "$tmpdir/bin/systemctl" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+  chmod +x "$tmpdir/bin/systemctl"
+
+  # Stub ip so tap check doesn't fail
+  cat > "$tmpdir/bin/ip" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+  chmod +x "$tmpdir/bin/ip"
+
+  output_file=$(mktemp)
+  set +e
+  PATH="$tmpdir/bin:$PATH" \
+    FC_RUNTIME_ROOT="$tmpdir/runtime" \
+    FC_LOG_ROOT="$tmpdir/log" \
+    bash "$REPO_ROOT/bin/fc-destroy" testvm --yes < /dev/null >"$output_file" 2>&1
+  status=$?
+  set -e
+
+  [[ "$status" -eq 0 ]] || fail "fc-destroy --yes failed: $(cat "$output_file")"
+  [[ ! -d "$tmpdir/runtime/vms/testvm" ]] || fail "fc-destroy did not remove instance directory"
+  [[ ! -f "$tmpdir/log/testvm.stdout.log" ]] || fail "fc-destroy did not remove stdout log"
+  [[ ! -f "$tmpdir/log/testvm.stderr.log" ]] || fail "fc-destroy did not remove stderr log"
+  grep -q 'Destroyed VM testvm' "$output_file" || fail "fc-destroy missing success message"
+)
+
 main() {
   test_disk_size_parser_accepts_gib_and_mib || return 1
   test_instance_creation_requires_existing_template || return 1
@@ -662,8 +837,14 @@ main() {
   test_fc_create_rejects_memory_below_minimum || return 1
   test_fc_create_normalizes_memory_gib_to_mib || return 1
   test_network_resolve_guest_ip_finds_mac_in_neighbor_table || return 1
+  test_network_resolve_guest_ip_prefers_ipv4_over_ipv6_link_local || return 1
+  test_network_resolve_guest_ip_falls_back_to_ipv6_when_no_ipv4 || return 1
   test_network_resolve_guest_ip_returns_failure_for_unknown_mac || return 1
   test_format_uptime_formats_seconds_correctly || return 1
+  test_fc_destroy_requires_vm_name || return 1
+  test_fc_destroy_fails_for_nonexistent_vm || return 1
+  test_fc_destroy_requires_confirmation_non_interactive || return 1
+  test_fc_destroy_removes_instance_with_yes_flag || return 1
   printf 'PASS: instance creation checks\n'
 }
 

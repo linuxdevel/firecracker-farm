@@ -23,7 +23,7 @@ EOF
   chmod +x "$stub_dir/$name"
 }
 
-test_fc_start_installs_stable_control_files_and_renders_forking_unit() (
+test_fc_start_installs_stable_control_files_and_renders_simple_unit() (
   local tmpdir unit_dir runtime_root log_root log_path unit_path control_root
 
   tmpdir=$(mktemp -d)
@@ -50,11 +50,11 @@ test_fc_start_installs_stable_control_files_and_renders_forking_unit() (
   [[ -f "$control_root/lib/firecracker.sh" ]] || fail "fc-start did not sync runtime libraries into the stable control path"
   [[ -f "$control_root/templates/vm-config.json.tmpl" ]] || fail "fc-start did not sync templates into the stable control path"
   grep -q '^Description=Firecracker microVM %i$' "$unit_path" || fail "installed unit missing template description"
-  grep -q '^Type=forking$' "$unit_path" || fail "installed unit missing forking supervision"
-  grep -q "^PIDFile=${runtime_root}/vms/%i/runtime/firecracker.pid$" "$unit_path" || fail "installed unit missing per-instance pid file"
+  grep -q '^Type=simple$' "$unit_path" || fail "installed unit missing Type=simple"
+  grep -q '^KillMode=control-group$' "$unit_path" || fail "installed unit missing KillMode=control-group"
   grep -q "^WorkingDirectory=${control_root}$" "$unit_path" || fail "installed unit missing stable working directory"
   grep -q "^ExecStart=${control_root}/bin/fc-start --direct %i$" "$unit_path" || fail "installed unit missing stable direct ExecStart"
-  grep -q "^ExecStop=${control_root}/bin/fc-stop --direct %i$" "$unit_path" || fail "installed unit missing stable direct ExecStop"
+  grep -q "^ExecStopPost=${control_root}/bin/fc-stop --direct %i$" "$unit_path" || fail "installed unit missing ExecStopPost cleanup"
   if grep -q "$REPO_ROOT" "$unit_path"; then
     fail "installed unit still hardcodes the transient worktree path"
   fi
@@ -104,7 +104,7 @@ test_fc_stop_reexecs_with_sudo_and_stops_instance_unit() (
 )
 
 main() {
-  test_fc_start_installs_stable_control_files_and_renders_forking_unit || return 1
+  test_fc_start_installs_stable_control_files_and_renders_simple_unit || return 1
   test_fc_start_reexecs_with_sudo_for_operator_flow || return 1
   test_fc_stop_reexecs_with_sudo_and_stops_instance_unit || return 1
   printf 'PASS: systemd lifecycle checks\n'

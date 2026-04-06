@@ -455,7 +455,7 @@ with open(output_path, "ab+") as handle:
 
 fc_firecracker_stage_assets() {
   local metadata_path=$1
-  local root_dir rootfs_path kernel_path
+  local root_dir rootfs_path kernel_path jailed_rootfs_path
 
   root_dir=$(fc_firecracker_jailer_root_dir_from_metadata_path "$metadata_path") || return 1
   rootfs_path=$(fc_firecracker_require_metadata_value "$metadata_path" "ROOTFS_PATH") || return 1
@@ -471,7 +471,15 @@ fc_firecracker_stage_assets() {
   }
 
   fc_firecracker_link_into_jail_root "$rootfs_path" "$root_dir" || return 1
-  fc_firecracker_copy_into_jail_root "$kernel_path" "$root_dir"
+  fc_firecracker_copy_into_jail_root "$kernel_path" "$root_dir" || return 1
+
+  # The jailer user needs read-write access to the rootfs disk image.
+  # The kernel only needs to be readable (it's loaded once at boot).
+  # When FC_JAILER_UID is 0 (root/default), the rootfs is already accessible.
+  if (( FC_JAILER_UID != 0 )); then
+    jailed_rootfs_path="$root_dir/$(basename -- "$rootfs_path")"
+    chown "${FC_JAILER_UID}:${FC_JAILER_GID}" "$jailed_rootfs_path" || return 1
+  fi
 }
 
 fc_firecracker_write_state() {
@@ -548,18 +556,30 @@ fc_firecracker_launch_jailer() {
   local api_socket_name=$3
   local stdout_log_path=$4
   local stderr_log_path=$5
+  local foreground=${6:-0}
 
-  "$(fc_firecracker_jailer_binary_path)" \
-    --id "$vm_name" \
-    --exec-file "$(fc_firecracker_binary_path)" \
-    --uid "$(id -u)" \
-    --gid "$(id -g)" \
-    --chroot-base-dir "$(fc_firecracker_runtime_dir "$vm_name")/jailer" \
-    --daemonize \
-    -- \
-    --config-file "$config_path" \
-    --api-sock "$api_socket_name" \
-    >>"$stdout_log_path" 2>>"$stderr_log_path"
+  local jailer_args=(
+    --id "$vm_name"
+    --exec-file "$(fc_firecracker_binary_path)"
+    --uid "$FC_JAILER_UID"
+    --gid "$FC_JAILER_GID"
+    --chroot-base-dir "$(fc_firecracker_runtime_dir "$vm_name")/jailer"
+  )
+
+  if (( ! foreground )); then
+    jailer_args+=( --daemonize )
+  fi
+
+  jailer_args+=( -- --config-file "$config_path" --api-sock "$api_socket_name" )
+
+  if (( foreground )); then
+    # exec replaces this process — used by systemd Type=simple
+    exec "$(fc_firecracker_jailer_binary_path)" "${jailer_args[@]}" \
+      >>"$stdout_log_path" 2>>"$stderr_log_path"
+  else
+    "$(fc_firecracker_jailer_binary_path)" "${jailer_args[@]}" \
+      >>"$stdout_log_path" 2>>"$stderr_log_path"
+  fi
 }
 
 fc_firecracker_wait_for_api_socket() {
@@ -578,91 +598,146 @@ fc_firecracker_wait_for_api_socket() {
   return 1
 }
 
-fc_firecracker_start() {
+fc_firecracker_setup_and_launch() {
+  # Shared setup for both daemonized and exec modes.
+  # Sets up networking, stages assets, renders config.
+  # Returns the metadata_path, config_path, api_socket_path, and tap state
+  # via variables in the caller's scope (nameref).
   local vm_name=$1
-  local metadata_path runtime_dir config_path api_socket_path stdout_log_path stderr_log_path
-  local stdout_pipe_path stderr_pipe_path stdout_capture_pid_path stderr_capture_pid_path
-  local tap_name mac_address bridge_name pid launched_pid=
-  local tap_created=0
+  local -n _metadata_path_ref=$2
+  local -n _config_path_ref=$3
+  local -n _api_socket_path_ref=$4
+  local -n _tap_created_ref=$5
+  local -n _stdout_log_path_ref=$6
+  local -n _stderr_log_path_ref=$7
 
-  metadata_path=$(fc_firecracker_vm_metadata_path "$vm_name")
-  [[ -f "$metadata_path" ]] || {
-    fc_error "instance metadata not found: $metadata_path"
+  local tap_name mac_address bridge_name
+
+  _metadata_path_ref=$(fc_firecracker_vm_metadata_path "$vm_name")
+  [[ -f "$_metadata_path_ref" ]] || {
+    fc_error "instance metadata not found: $_metadata_path_ref"
     return 1
   }
 
-  runtime_dir=$(fc_firecracker_runtime_dir_from_metadata_path "$metadata_path")
-  config_path=$(fc_firecracker_config_path_from_metadata_path "$metadata_path")
-  api_socket_path=$(fc_firecracker_api_socket_path_from_metadata_path "$metadata_path")
-  stdout_log_path=$(fc_firecracker_stdout_log_path "$vm_name")
-  stderr_log_path=$(fc_firecracker_stderr_log_path "$vm_name")
-  stdout_pipe_path=$(fc_firecracker_stdout_pipe_path_from_metadata_path "$metadata_path")
-  stderr_pipe_path=$(fc_firecracker_stderr_pipe_path_from_metadata_path "$metadata_path")
-  stdout_capture_pid_path=$(fc_firecracker_log_capture_pid_path_from_metadata_path "$metadata_path" stdout)
-  stderr_capture_pid_path=$(fc_firecracker_log_capture_pid_path_from_metadata_path "$metadata_path" stderr)
-  tap_name=$(fc_firecracker_require_metadata_value "$metadata_path" "TAP_NAME") || return 1
+  _config_path_ref=$(fc_firecracker_config_path_from_metadata_path "$_metadata_path_ref")
+  _api_socket_path_ref=$(fc_firecracker_api_socket_path_from_metadata_path "$_metadata_path_ref")
+  _stdout_log_path_ref=$(fc_firecracker_stdout_log_path "$vm_name")
+  _stderr_log_path_ref=$(fc_firecracker_stderr_log_path "$vm_name")
+  _tap_created_ref=0
+
+  tap_name=$(fc_firecracker_require_metadata_value "$_metadata_path_ref" "TAP_NAME") || return 1
   tap_name=$(fc_firecracker_require_managed_tap_name "$tap_name" "start") || return 1
-  mac_address=$(fc_firecracker_require_metadata_value "$metadata_path" "MAC_ADDRESS") || return 1
-  bridge_name=$(fc_firecracker_require_metadata_value "$metadata_path" "BRIDGE_NAME") || return 1
+  mac_address=$(fc_firecracker_require_metadata_value "$_metadata_path_ref" "MAC_ADDRESS") || return 1
+  bridge_name=$(fc_firecracker_require_metadata_value "$_metadata_path_ref" "BRIDGE_NAME") || return 1
   bridge_name=$(fc_firecracker_require_managed_bridge_name "$bridge_name" "start") || return 1
 
-  if [[ -f "$(fc_firecracker_pid_path_from_metadata_path "$metadata_path")" ]]; then
+  if [[ -f "$(fc_firecracker_pid_path_from_metadata_path "$_metadata_path_ref")" ]]; then
     fc_error "VM already has a recorded pid: $vm_name"
     return 1
   fi
 
-  fc_firecracker_prepare_runtime_dirs "$metadata_path" || return 1
-  fc_firecracker_prepare_logs "$stdout_log_path" "$stderr_log_path" || return 1
+  fc_firecracker_prepare_runtime_dirs "$_metadata_path_ref" || return 1
+  fc_firecracker_prepare_logs "$_stdout_log_path_ref" "$_stderr_log_path_ref" || return 1
+  rm -f "$_api_socket_path_ref"
+
+  if ! fc_network_tap_exists "$tap_name"; then
+    fc_network_create_tap "$tap_name" "$mac_address" || {
+      fc_firecracker_cleanup_start_failure "$_metadata_path_ref"
+      return 1
+    }
+    _tap_created_ref=1
+    if ! fc_network_attach_tap_to_bridge "$tap_name" "$bridge_name"; then
+      fc_network_delete_tap "$tap_name" || true
+      fc_firecracker_cleanup_start_failure "$_metadata_path_ref"
+      return 1
+    fi
+    if ! fc_network_set_tap_up "$tap_name"; then
+      fc_network_delete_tap "$tap_name" || true
+      fc_firecracker_cleanup_start_failure "$_metadata_path_ref"
+      return 1
+    fi
+  fi
+
+  if ! fc_firecracker_stage_assets "$_metadata_path_ref"; then
+    if (( _tap_created_ref )); then
+      fc_firecracker_cleanup_start_failure "$_metadata_path_ref" "$tap_name"
+    else
+      fc_firecracker_cleanup_start_failure "$_metadata_path_ref"
+    fi
+    return 1
+  fi
+  if ! fc_firecracker_render_config "$_metadata_path_ref" "$_config_path_ref"; then
+    if (( _tap_created_ref )); then
+      fc_firecracker_cleanup_start_failure "$_metadata_path_ref" "$tap_name"
+    else
+      fc_firecracker_cleanup_start_failure "$_metadata_path_ref"
+    fi
+    return 1
+  fi
+}
+
+fc_firecracker_start_exec() {
+  # Start a VM by exec'ing into the jailer (foreground, no daemonize).
+  # Used by systemd Type=simple — this function never returns on success.
+  local vm_name=$1
+  local metadata_path config_path api_socket_path stdout_log_path stderr_log_path
+  local tap_created
+
+  fc_firecracker_setup_and_launch "$vm_name" \
+    metadata_path config_path api_socket_path tap_created \
+    stdout_log_path stderr_log_path || return 1
+
+  # Write PID file with current PID — exec preserves PID
+  printf '%s\n' "$$" > "$(fc_firecracker_pid_path_from_metadata_path "$metadata_path")"
+  fc_firecracker_write_state_from_metadata_path "$metadata_path" "$vm_name" running "$$" "$api_socket_path"
+
+  # exec replaces this process with jailer→firecracker (foreground)
+  # systemd captures stdout/stderr via journal
+  fc_firecracker_launch_jailer \
+    "$vm_name" \
+    "$(basename -- "$config_path")" \
+    "$(basename -- "$api_socket_path")" \
+    "$stdout_log_path" \
+    "$stderr_log_path" \
+    1  # foreground=1 → exec, no --daemonize
+
+  # If we reach here, exec failed
+  fc_error "exec into jailer failed for $vm_name"
+  return 1
+}
+
+fc_firecracker_start() {
+  # Start a VM with daemonization (interactive / non-systemd mode).
+  # Launches jailer with --daemonize, discovers PID, writes state.
+  local vm_name=$1
+  local metadata_path config_path api_socket_path stdout_log_path stderr_log_path
+  local stdout_pipe_path stderr_pipe_path stdout_capture_pid_path stderr_capture_pid_path
+  local tap_created pid launched_pid=
+
+  fc_firecracker_setup_and_launch "$vm_name" \
+    metadata_path config_path api_socket_path tap_created \
+    stdout_log_path stderr_log_path || return 1
+
+  stdout_pipe_path=$(fc_firecracker_stdout_pipe_path_from_metadata_path "$metadata_path")
+  stderr_pipe_path=$(fc_firecracker_stderr_pipe_path_from_metadata_path "$metadata_path")
+  stdout_capture_pid_path=$(fc_firecracker_log_capture_pid_path_from_metadata_path "$metadata_path" stdout)
+  stderr_capture_pid_path=$(fc_firecracker_log_capture_pid_path_from_metadata_path "$metadata_path" stderr)
+
   fc_firecracker_start_log_capture "$stdout_pipe_path" "$stdout_log_path" "$stdout_capture_pid_path" || return 1
   fc_firecracker_start_log_capture "$stderr_pipe_path" "$stderr_log_path" "$stderr_capture_pid_path" || {
     fc_firecracker_cleanup_start_log_capture "$metadata_path"
     return 1
   }
-  rm -f "$api_socket_path"
-
-  if ! fc_network_tap_exists "$tap_name"; then
-    fc_network_create_tap "$tap_name" "$mac_address" || {
-      fc_firecracker_cleanup_start_failure "$metadata_path"
-      return 1
-    }
-    tap_created=1
-    if ! fc_network_attach_tap_to_bridge "$tap_name" "$bridge_name"; then
-      fc_network_delete_tap "$tap_name" || true
-      fc_firecracker_cleanup_start_failure "$metadata_path"
-      return 1
-    fi
-    if ! fc_network_set_tap_up "$tap_name"; then
-      fc_network_delete_tap "$tap_name" || true
-      fc_firecracker_cleanup_start_failure "$metadata_path"
-      return 1
-    fi
-  fi
-
-  if ! fc_firecracker_stage_assets "$metadata_path"; then
-    if (( tap_created )); then
-      fc_firecracker_cleanup_start_failure "$metadata_path" "$tap_name"
-    else
-      fc_firecracker_cleanup_start_failure "$metadata_path"
-    fi
-    return 1
-  fi
-  if ! fc_firecracker_render_config "$metadata_path" "$config_path"; then
-    if (( tap_created )); then
-      fc_firecracker_cleanup_start_failure "$metadata_path" "$tap_name"
-    else
-      fc_firecracker_cleanup_start_failure "$metadata_path"
-    fi
-    return 1
-  fi
 
   fc_firecracker_launch_jailer \
     "$vm_name" \
     "$(basename -- "$config_path")" \
     "$(basename -- "$api_socket_path")" \
     "$stdout_pipe_path" \
-    "$stderr_pipe_path" || {
+    "$stderr_pipe_path" \
+    0 || {
       if (( tap_created )); then
-        fc_firecracker_cleanup_start_failure "$metadata_path" "$tap_name"
+        fc_firecracker_cleanup_start_failure "$metadata_path" "$(fc_firecracker_require_metadata_value "$metadata_path" TAP_NAME)"
       else
         fc_firecracker_cleanup_start_failure "$metadata_path"
       fi
@@ -679,7 +754,7 @@ fc_firecracker_start() {
 
   fc_firecracker_wait_for_api_socket "$api_socket_path" || {
     if (( tap_created )); then
-      fc_firecracker_cleanup_start_failure "$metadata_path" "$tap_name" "$launched_pid"
+      fc_firecracker_cleanup_start_failure "$metadata_path" "$(fc_firecracker_require_metadata_value "$metadata_path" TAP_NAME)" "$launched_pid"
     else
       fc_firecracker_cleanup_start_failure "$metadata_path" "" "$launched_pid"
     fi
@@ -691,7 +766,7 @@ fc_firecracker_start() {
   fi
   pid=$(fc_firecracker_require_safe_pid "$pid" "start") || {
     if (( tap_created )); then
-      fc_firecracker_cleanup_start_failure "$metadata_path" "$tap_name" "$launched_pid"
+      fc_firecracker_cleanup_start_failure "$metadata_path" "$(fc_firecracker_require_metadata_value "$metadata_path" TAP_NAME)" "$launched_pid"
     else
       fc_firecracker_cleanup_start_failure "$metadata_path" "" "$launched_pid"
     fi
@@ -700,7 +775,7 @@ fc_firecracker_start() {
   if [[ -z "$pid" ]]; then
     fc_error "unable to determine Firecracker pid from API socket: $api_socket_path"
     if (( tap_created )); then
-      fc_firecracker_cleanup_start_failure "$metadata_path" "$tap_name" "$launched_pid"
+      fc_firecracker_cleanup_start_failure "$metadata_path" "$(fc_firecracker_require_metadata_value "$metadata_path" TAP_NAME)" "$launched_pid"
     else
       fc_firecracker_cleanup_start_failure "$metadata_path" "" "$launched_pid"
     fi
@@ -709,7 +784,7 @@ fc_firecracker_start() {
 
   if ! printf '%s\n' "$pid" > "$(fc_firecracker_pid_path_from_metadata_path "$metadata_path")"; then
     if (( tap_created )); then
-      fc_firecracker_cleanup_start_failure "$metadata_path" "$tap_name" "$pid"
+      fc_firecracker_cleanup_start_failure "$metadata_path" "$(fc_firecracker_require_metadata_value "$metadata_path" TAP_NAME)" "$pid"
     else
       fc_firecracker_cleanup_start_failure "$metadata_path" "" "$pid"
     fi
@@ -717,7 +792,7 @@ fc_firecracker_start() {
   fi
   if ! fc_firecracker_write_state_from_metadata_path "$metadata_path" "$vm_name" running "$pid" "$api_socket_path"; then
     if (( tap_created )); then
-      fc_firecracker_cleanup_start_failure "$metadata_path" "$tap_name" "$pid"
+      fc_firecracker_cleanup_start_failure "$metadata_path" "$(fc_firecracker_require_metadata_value "$metadata_path" TAP_NAME)" "$pid"
     else
       fc_firecracker_cleanup_start_failure "$metadata_path" "" "$pid"
     fi
@@ -787,8 +862,11 @@ fc_firecracker_stop() {
   pid=$(fc_firecracker_require_safe_pid "$pid" "stop") || return 1
   api_socket_path=$(fc_firecracker_api_socket_path_from_metadata_path "$metadata_path")
   if fc_file_exists "$api_socket_path"; then
-    pid=$(fc_firecracker_pid_from_api_socket "$api_socket_path") || return 1
-    pid=$(fc_firecracker_require_safe_pid "$pid" "stop api socket") || return 1
+    local socket_pid
+    socket_pid=$(fc_firecracker_pid_from_api_socket "$api_socket_path" 2>/dev/null || true)
+    if [[ -n "$socket_pid" ]] && fc_firecracker_pid_is_safe "$socket_pid"; then
+      pid=$socket_pid
+    fi
   fi
 
   if fc_process_is_running "$pid"; then
