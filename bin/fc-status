@@ -37,6 +37,10 @@ fc_status_main() {
 
   fc_require_argument_count "$#" 1 "Usage: fc-status <name>" || return 1
 
+  if ! fc_running_as_root; then
+    fc_reexec_with_sudo "$0" "$@"
+  fi
+
   local info_output
   info_output=$(fc_firecracker_vm_info "$1") || return 1
 

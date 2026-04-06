@@ -96,11 +96,23 @@ test_instance_creation_clones_resizes_and_writes_metadata() (
 )
 
 test_fc_create_requires_credentials_in_non_interactive_mode() (
-  local output_file status
+  local tmpdir output_file status
+
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/bin"
+
+  # Stub id to return root so fc-create skips sudo re-exec and reaches
+  # the credential validation logic.
+  cat > "$tmpdir/bin/id" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-u' ]]; then printf '0\n'; else /usr/bin/id "$@"; fi
+EOF
+  chmod +x "$tmpdir/bin/id"
 
   output_file=$(mktemp)
   set +e
-  bash "$REPO_ROOT/bin/fc-create" testvm < /dev/null >"$output_file" 2>&1
+  PATH="$tmpdir/bin:$PATH" \
+    bash "$REPO_ROOT/bin/fc-create" testvm < /dev/null >"$output_file" 2>&1
   status=$?
   set -e
 
@@ -467,12 +479,21 @@ EOF
 )
 
 test_fc_create_rejects_invalid_vcpu_values() (
-  local output_file status
+  local tmpdir output_file status
+
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/bin"
+  cat > "$tmpdir/bin/id" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-u' ]]; then printf '0\n'; else /usr/bin/id "$@"; fi
+EOF
+  chmod +x "$tmpdir/bin/id"
 
   # Test --vcpus 0
   output_file=$(mktemp)
   set +e
-  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --vcpus 0 < /dev/null > "$output_file" 2>&1
+  PATH="$tmpdir/bin:$PATH" \
+    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --vcpus 0 < /dev/null > "$output_file" 2>&1
   status=$?
   set -e
   [[ "$status" -ne 0 ]] || fail "fc-create should reject --vcpus 0"
@@ -480,18 +501,28 @@ test_fc_create_rejects_invalid_vcpu_values() (
   # Test --vcpus abc
   output_file=$(mktemp)
   set +e
-  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --vcpus abc < /dev/null > "$output_file" 2>&1
+  PATH="$tmpdir/bin:$PATH" \
+    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --vcpus abc < /dev/null > "$output_file" 2>&1
   status=$?
   set -e
   [[ "$status" -ne 0 ]] || fail "fc-create should reject --vcpus abc"
 )
 
 test_fc_create_rejects_memory_below_minimum() (
-  local output_file status
+  local tmpdir output_file status
+
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/bin"
+  cat > "$tmpdir/bin/id" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-u' ]]; then printf '0\n'; else /usr/bin/id "$@"; fi
+EOF
+  chmod +x "$tmpdir/bin/id"
 
   output_file=$(mktemp)
   set +e
-  bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --memory 64m < /dev/null > "$output_file" 2>&1
+  PATH="$tmpdir/bin:$PATH" \
+    bash "$REPO_ROOT/bin/fc-create" testvm --disk-size 20G --guest-user testuser --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey test@test" --memory 64m < /dev/null > "$output_file" 2>&1
   status=$?
   set -e
   [[ "$status" -ne 0 ]] || fail "fc-create should reject --memory 64m (below 128 MiB minimum)"

@@ -170,6 +170,12 @@ fc_create_main() {
     return 1
   fi
 
+  # --- Sudo re-exec (before interactive prompts so credentials are only
+  #     gathered once, inside the root process) ---
+  if ! fc_running_as_root; then
+    fc_reexec_with_sudo "$0" "${original_args[@]}"
+  fi
+
   # --- Guest user ---
   if [[ -z "$guest_user" ]]; then
     if [[ -t 0 ]]; then
@@ -238,11 +244,6 @@ fc_create_main() {
   if (( mem_size_mib < 128 )); then
     fc_error "--memory must be at least 128 MiB (got: ${mem_size_mib} MiB)"
     return 1
-  fi
-
-  # --- Sudo re-exec (passes all original flags through) ---
-  if ! fc_running_as_root; then
-    fc_reexec_with_sudo "$0" "${original_args[@]}"
   fi
 
   # --- Create the VM ---

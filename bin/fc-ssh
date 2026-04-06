@@ -107,8 +107,12 @@ fc_ssh_main() {
         return 1
     fi
 
-    local guest_ip
+    local guest_ip guest_user metadata_path
     guest_ip=$(fc_ssh_resolve_ip "$vm_name") || return 1
+
+    metadata_path=$(fc_firecracker_vm_metadata_path "$vm_name")
+    guest_user=$(fc_firecracker_env_get "$metadata_path" "GUEST_USER")
+    guest_user=${guest_user:-$FC_GUEST_USER}
 
     local ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
     if [[ -n "$identity" ]]; then
@@ -120,10 +124,10 @@ fc_ssh_main() {
         if [[ -n "$identity" ]]; then
             copy_id_opts+=(-i "$identity")
         fi
-        exec ssh-copy-id "${copy_id_opts[@]}" "${FC_GUEST_USER}@${guest_ip}"
+        exec ssh-copy-id "${copy_id_opts[@]}" "${guest_user}@${guest_ip}"
     fi
 
-    exec ssh "${ssh_opts[@]}" "${FC_GUEST_USER}@${guest_ip}" "${ssh_args[@]}"
+    exec ssh "${ssh_opts[@]}" "${guest_user}@${guest_ip}" "${ssh_args[@]}"
 }
 
 fc_ssh_main "$@"

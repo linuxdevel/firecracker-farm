@@ -41,6 +41,10 @@ fc_list_main() {
       ;;
   esac
 
+  if ! fc_running_as_root; then
+    fc_reexec_with_sudo "$0" "$@"
+  fi
+
   local instances_dir
   instances_dir=$(fc_vm_instances_dir)
 
