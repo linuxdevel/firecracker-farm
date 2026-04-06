@@ -161,6 +161,25 @@ fc_network_resolve_guest_ip_from_neigh() {
             }'
 }
 
+fc_network_cidr_broadcast() {
+    local cidr=$1
+    local ip prefix a b c d ip_int host_bits host_mask broadcast
+
+    IFS=/ read -r ip prefix <<< "$cidr"
+    IFS=. read -r a b c d <<< "$ip"
+
+    ip_int=$(( (a << 24) | (b << 16) | (c << 8) | d ))
+    host_bits=$(( 32 - prefix ))
+    host_mask=$(( (1 << host_bits) - 1 ))
+    broadcast=$(( ip_int | host_mask ))
+
+    printf '%d.%d.%d.%d\n' \
+        $(( (broadcast >> 24) & 0xFF )) \
+        $(( (broadcast >> 16) & 0xFF )) \
+        $(( (broadcast >> 8) & 0xFF )) \
+        $(( broadcast & 0xFF ))
+}
+
 fc_network_resolve_guest_ip() {
     local mac_address=$1
     local bridge_name=${2:-$FC_DEFAULT_BRIDGE}
@@ -174,9 +193,26 @@ fc_network_resolve_guest_ip() {
         return 0
     fi
 
-    # Try arping to populate the neighbor table, then retry
-    if command -v arping >/dev/null 2>&1; then
-        arping -c 1 -w 1 -I "$bridge_name" -D 255.255.255.255 >/dev/null 2>&1 || true
+    # The host's ARP cache only contains IPs it has communicated with directly.
+    # VMs that talk only to the router never appear. Trigger an ARP sweep of the
+    # bridge subnet so all connected hosts expose their IP→MAC mapping.
+    #
+    # nmap -PR sends ARP who-has for every IP in the subnet; the kernel handles
+    # the ARP replies and populates the neighbor cache. Fall back to a broadcast
+    # ping if nmap is unavailable (works when guests respond to broadcast ICMP).
+    local bridge_cidr
+    bridge_cidr=$(ip -4 addr show dev "$bridge_name" 2>/dev/null \
+        | awk '/inet / {print $2; exit}')
+    if [[ -n "$bridge_cidr" ]]; then
+        if command -v nmap >/dev/null 2>&1; then
+            nmap -PR -sn -n "$bridge_cidr" >/dev/null 2>&1 || true
+        else
+            local broadcast
+            broadcast=$(fc_network_cidr_broadcast "$bridge_cidr")
+            if [[ -n "$broadcast" ]]; then
+                ping -b -c 3 -i 0.1 -W 1 "$broadcast" >/dev/null 2>&1 || true
+            fi
+        fi
         sleep 0.3
         ip=$(fc_network_resolve_guest_ip_from_neigh "$mac_address" "$bridge_name")
         if [[ -n "$ip" ]]; then
