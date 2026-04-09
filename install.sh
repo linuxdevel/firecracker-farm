@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — Install firecracker-farm on a Proxmox host.
+# install.sh — Install firecracker-farm on a Linux KVM host.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/install.sh | sudo bash
@@ -22,7 +22,7 @@ usage() {
   cat <<EOF
 Usage: install.sh [OPTIONS]
 
-Install firecracker-farm tools and Firecracker runtime on a Proxmox host.
+Install firecracker-farm tools and Firecracker runtime on a Linux host with KVM support.
 
 Options:
   --version TAG        Install a specific release (default: latest)

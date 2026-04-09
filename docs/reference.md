@@ -1,5 +1,8 @@
 # firecracker-farm reference
 
+Unless noted otherwise, examples here describe the current host configuration
+(for example `vmbr0`) rather than a product requirement for a specific platform.
+
 ## Commands
 
 ### install.sh

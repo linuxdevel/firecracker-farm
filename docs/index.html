@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>firecracker-farm — Persistent Firecracker microVMs on Proxmox</title>
-  <meta name="description" content="Shell toolkit for running persistent Firecracker microVMs on Proxmox. Create, start, stop, and SSH in with one command.">
+  <title>firecracker-farm — Persistent Firecracker microVMs on Linux KVM hosts</title>
+  <meta name="description" content="Shell toolkit for running persistent Firecracker microVMs on a Linux KVM host. Create, start, stop, and SSH in with one command.">
   <meta property="og:title" content="firecracker-farm">
-  <meta property="og:description" content="Persistent Firecracker microVMs on Proxmox with simple shell commands.">
+  <meta property="og:description" content="Persistent Firecracker microVMs on a Linux KVM host with simple shell commands.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://linuxdevel.github.io/firecracker-farm/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,7 +36,7 @@
     </div>
     <p class="hero-tagline">
       Create, start, stop, and SSH into hardware-isolated microVMs with simple shell commands.
-      Persistent disks. DHCP networking. Systemd lifecycle. On your Proxmox host.
+      Persistent disks. DHCP networking. Systemd lifecycle. On your Linux KVM host.
     </p>
     <div class="hero-install">
       <span>$</span> curl -fsSL https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/install.sh | sudo bash
@@ -91,7 +91,7 @@
 <section id="features">
   <div class="container">
     <h2 class="section-title">Features</h2>
-    <p class="section-subtitle">Everything you need to run a fleet of microVMs on your Proxmox host.</p>
+    <p class="section-subtitle">Everything you need to run a fleet of microVMs on your Linux KVM host.</p>
 
     <div class="features-grid">
       <div class="feature-card">
@@ -261,7 +261,7 @@
       <svg width="720" height="440" viewBox="0 0 720 440" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- Host boundary -->
         <rect x="20" y="10" width="680" height="370" rx="8" stroke="#30363d" stroke-width="2" stroke-dasharray="6 4" fill="none"/>
-        <text x="40" y="35" fill="#8b949e" font-family="Inter,sans-serif" font-size="13" font-weight="600">Proxmox Host</text>
+        <text x="40" y="35" fill="#8b949e" font-family="Inter,sans-serif" font-size="13" font-weight="600">Linux KVM Host</text>
 
         <!-- VM 1 -->
         <rect x="60" y="55" width="160" height="90" rx="6" fill="#58a6ff" opacity="0.08" stroke="#58a6ff" stroke-width="1.5"/>
@@ -666,7 +666,7 @@
       <a href="https://github.com/linuxdevel/firecracker-farm/blob/main/CONTRIBUTING.md">Contributing</a>
       <a href="https://github.com/linuxdevel/firecracker-farm/blob/main/LICENSE">License</a>
     </div>
-    <p>Apache 2.0 &mdash; Built for Proxmox</p>
+    <p>Apache 2.0 &mdash; Built for Linux KVM hosts</p>
     <p>Powered by <a href="https://github.com/firecracker-microvm/firecracker">Firecracker</a> from AWS</p>
   </div>
 </footer>

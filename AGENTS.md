@@ -2,10 +2,10 @@
 
 ## Purpose
 
-This repository automates creation of persistent Firecracker microVMs on a Proxmox host.
+This repository automates creation of persistent Firecracker microVMs on a Linux host with KVM support.
 
 The target outcome is:
-- Firecracker-based microVMs running directly on the Proxmox host
+- Firecracker-based microVMs running directly on the host
 - Ubuntu guests on the existing LAN via `vmbr0`
 - persistent per-instance writable rootfs disks
 - default guest user: operator username (configurable via `--guest-user`)
@@ -14,10 +14,10 @@ The target outcome is:
 
 ## Safety Rules
 
-- Do not perform destructive actions on existing Proxmox VMs, storage pools, bridges, or firewall configuration.
+- Do not perform destructive actions on existing host VMs, storage pools, bridges, or firewall configuration.
 - Prefer additive changes only.
 - Do not modify `/etc/network/interfaces` unless explicitly approved.
-- Use `vmbr0` as the default bridge unless the user approves something else.
+- Use the configured host bridge as the default unless the user approves something else. In the current environment, that bridge is `vmbr0`.
 - Keep all Firecracker assets under dedicated Firecracker paths.
 - Preserve logs and failed artifacts for debugging.
 - Do not add destructive delete/cleanup flows by default.
@@ -35,7 +35,7 @@ The target outcome is:
 
 ## Project Defaults
 
-- Bridge: `vmbr0`
+- Bridge: `vmbr0` in the current tested environment
 - Disk size: `20G`
 - Memory: `1024M`
 - vCPUs: `1`
@@ -66,4 +66,4 @@ Planned repository layout:
 - If a task has an approved implementation plan, execute it in subagent-driven mode.
 - Keep changes minimal and explicit.
 - Verify behavior with focused commands before moving to the next task.
-- When working against the Proxmox host, inspect first and change second.
+- When working against the current host, inspect first and change second.

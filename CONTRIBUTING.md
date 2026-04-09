@@ -26,7 +26,7 @@ changes are reviewed, tested, and tracked properly.
 ## Reporting issues
 
 Open an issue on the [GitHub issue tracker](https://github.com/linuxdevel/firecracker-farm/issues).
-Include your Proxmox version, kernel version, and relevant log output.
+Include general host or platform details, kernel version, and relevant log output.
 
 ## License
 

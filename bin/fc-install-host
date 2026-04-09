@@ -415,7 +415,7 @@ fc_run_install() {
 
   fc_info "Installing Firecracker host prerequisites"
   fc_info "This only installs packages, dedicated directories, and release binaries"
-  fc_info "Existing Proxmox VM configuration is not modified"
+  fc_info "Existing host VM configuration is not modified"
 
   fc_check_sudo_access
   fc_require_install_command "dpkg is available" dpkg

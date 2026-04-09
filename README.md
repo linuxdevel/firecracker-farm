@@ -1,6 +1,6 @@
 # firecracker-farm
 
-Shell-based tooling for creating and managing persistent [Firecracker](https://firecracker-microvm.github.io/) microVMs on a Proxmox host.
+Shell-based tooling for creating and managing persistent [Firecracker](https://firecracker-microvm.github.io/) microVMs on a Linux KVM host.
 
 > **Project overview:** For a high-level introduction to the architecture, features, and quick-start workflow, visit the [firecracker-farm project page](https://linuxdevel.github.io/firecracker-farm/).
 
@@ -31,11 +31,11 @@ Firecracker is developed and maintained by Amazon Web Services under the Apache 
 
 ## What firecracker-farm does
 
-- Provisions Firecracker and jailer binaries on a Proxmox host
+- Provisions Firecracker and jailer binaries on a Linux KVM host
 - Builds a reusable Ubuntu 24.04 cloud image template (bare ext4 rootfs)
 - Creates persistent per-instance disks with configurable size
 - Injects cloud-init seed (user, SSH key, hostname) directly into the rootfs
-- Launches VMs via jailer with tap networking bridged to `vmbr0`
+- Launches VMs via jailer with tap networking bridged to `vmbr0` by default
 - Manages VM lifecycle through systemd template units
 - Provides a configurable guest user with passwordless sudo and SSH key access
 
@@ -126,10 +126,10 @@ When running interactively, `fc-create` prompts for both if not provided via fla
 
 ## Requirements
 
-- Proxmox VE host with `/dev/kvm` and cgroups v2
-- Linux bridge `vmbr0` (or override via `FC_DEFAULT_BRIDGE`)
+- Linux host with `/dev/kvm`, cgroups v2, and systemd
+- Linux bridge networking available, using `vmbr0` by default (or override via `FC_DEFAULT_BRIDGE`)
+- DHCP available on the attached network (for guest IPv4)
 - Passwordless sudo for the operator user
-- DHCP server on the LAN (for guest IPv4)
 
 ### Host packages
 
@@ -193,7 +193,7 @@ The jailer runs Firecracker as a dedicated unprivileged system user (`firecracke
 
 ### Networking
 
-Each VM gets a deterministic tap name (`fc-<name>0`) and a stable locally-administered MAC address derived from the instance name. The tap is bridged to `vmbr0`. Inside the guest, cloud-init configures netplan with DHCP on all Ethernet interfaces via an injected `network-config` file (netplan v2). The host resolves guest IPs from the ARP/neighbor table, preferring IPv4 over link-local IPv6.
+Each VM gets a deterministic tap name (`fc-<name>0`) and a stable locally-administered MAC address derived from the instance name. The tap is bridged to the configured Linux bridge, `vmbr0` by default. Inside the guest, cloud-init configures netplan with DHCP on all Ethernet interfaces via an injected `network-config` file (netplan v2). The host resolves guest IPs from the ARP/neighbor table, preferring IPv4 over link-local IPv6.
 
 ### Instance destruction
 
@@ -224,7 +224,7 @@ Test suites:
 
 ## Safety
 
-- Never modifies existing Proxmox VMs, storage pools, bridges, or firewall rules
+- Never modifies existing host VMs, storage pools, bridges, or firewall rules
 - Never modifies `/etc/network/interfaces`
 - All Firecracker assets are kept under dedicated paths (`/var/lib/firecracker`, `/opt/firecracker`)
 - No destructive delete/cleanup commands without explicit confirmation (`fc-destroy` requires `--yes` or interactive prompt)
