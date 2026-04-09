@@ -11,78 +11,127 @@
   <meta property="og:url" content="https://linuxdevel.github.io/firecracker-farm/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ════════════════════════════════════════════ HERO ════════════════════════════════════════════ -->
-<section class="hero">
+<header class="site-header">
   <div class="container">
-    <div class="hero-logo">
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="4" y="8" width="40" height="32" rx="4" stroke="#58a6ff" stroke-width="2" fill="none"/>
-        <rect x="10" y="14" width="10" height="10" rx="2" fill="#58a6ff" opacity="0.3"/>
-        <rect x="10" y="14" width="10" height="10" rx="2" stroke="#58a6ff" stroke-width="1.5" fill="none"/>
-        <rect x="24" y="14" width="10" height="10" rx="2" fill="#3fb950" opacity="0.3"/>
-        <rect x="24" y="14" width="10" height="10" rx="2" stroke="#3fb950" stroke-width="1.5" fill="none"/>
-        <rect x="17" y="28" width="10" height="10" rx="2" fill="#d29922" opacity="0.3"/>
-        <rect x="17" y="28" width="10" height="10" rx="2" stroke="#d29922" stroke-width="1.5" fill="none"/>
-        <circle cx="15" cy="19" r="2" fill="#58a6ff"/>
-        <circle cx="29" cy="19" r="2" fill="#3fb950"/>
-        <circle cx="22" cy="33" r="2" fill="#d29922"/>
-      </svg>
-      firecracker-farm
-    </div>
-    <p class="hero-tagline">
-      Create, start, stop, and SSH into hardware-isolated microVMs with simple shell commands.
-      Persistent disks. DHCP networking. Systemd lifecycle. On your Linux KVM host.
-    </p>
-    <div class="hero-install">
-      <span>$</span> curl -fsSL https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/install.sh | sudo bash
-    </div>
-    <div class="hero-actions">
-      <a href="#quickstart" class="btn btn-primary">Get Started</a>
-      <a href="https://github.com/linuxdevel/firecracker-farm" class="btn btn-secondary">
-        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-        GitHub
-      </a>
-    </div>
+    <a class="brand" href="#top" aria-label="firecracker-farm home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="8" width="40" height="32" rx="4" stroke="#79c6ff" stroke-width="2" fill="none"/>
+          <rect x="10" y="14" width="10" height="10" rx="2" fill="#79c6ff" opacity="0.3"/>
+          <rect x="24" y="14" width="10" height="10" rx="2" fill="#79f0bb" opacity="0.28"/>
+          <rect x="17" y="28" width="10" height="10" rx="2" fill="#ffd37a" opacity="0.28"/>
+        </svg>
+      </span>
+      <span>firecracker-farm</span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#security">Security</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#openclaw">OpenClaw</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+  </div>
+</header>
 
-    <!-- Hero graphic: stylized VM fleet -->
-    <div class="hero-graphic">
-      <svg width="600" height="200" viewBox="0 0 600 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- VMs -->
-        <rect x="60" y="20" width="100" height="60" rx="6" fill="#58a6ff" opacity="0.1" stroke="#58a6ff" stroke-width="1.5"/>
-        <text x="110" y="45" text-anchor="middle" fill="#58a6ff" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-web01</text>
-        <text x="110" y="62" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="9">2 vCPU · 2G</text>
+<div class="trust-strip">
+  <div class="container">
+    <div class="trust-pill"><span class="trust-dot" aria-hidden="true"></span><strong>KVM isolated</strong></div>
+    <div class="trust-pill"><span class="trust-dot" aria-hidden="true"></span><strong>Persistent rootfs</strong></div>
+    <div class="trust-pill"><span class="trust-dot" aria-hidden="true"></span><strong>LAN bridged</strong></div>
+    <div class="trust-pill"><span class="trust-dot" aria-hidden="true"></span><strong>systemd managed</strong></div>
+  </div>
+</div>
 
-        <rect x="250" y="20" width="100" height="60" rx="6" fill="#3fb950" opacity="0.1" stroke="#3fb950" stroke-width="1.5"/>
-        <text x="300" y="45" text-anchor="middle" fill="#3fb950" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-app01</text>
-        <text x="300" y="62" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="9">4 vCPU · 4G</text>
+<!-- ════════════════════════════════════════════ HERO ════════════════════════════════════════════ -->
+<section class="hero" id="top">
+  <div class="container">
+    <div class="hero-shell">
+      <div class="hero-layout">
+        <div>
+          <div class="eyebrow">Persistent Firecracker fleet operations</div>
+          <div class="hero-logo">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="8" width="40" height="32" rx="4" stroke="#79c6ff" stroke-width="2" fill="none"/>
+              <rect x="10" y="14" width="10" height="10" rx="2" fill="#79c6ff" opacity="0.3"/>
+              <rect x="10" y="14" width="10" height="10" rx="2" stroke="#79c6ff" stroke-width="1.5" fill="none"/>
+              <rect x="24" y="14" width="10" height="10" rx="2" fill="#79f0bb" opacity="0.3"/>
+              <rect x="24" y="14" width="10" height="10" rx="2" stroke="#79f0bb" stroke-width="1.5" fill="none"/>
+              <rect x="17" y="28" width="10" height="10" rx="2" fill="#ffd37a" opacity="0.3"/>
+              <rect x="17" y="28" width="10" height="10" rx="2" stroke="#ffd37a" stroke-width="1.5" fill="none"/>
+              <circle cx="15" cy="19" r="2" fill="#79c6ff"/>
+              <circle cx="29" cy="19" r="2" fill="#79f0bb"/>
+              <circle cx="22" cy="33" r="2" fill="#ffd37a"/>
+            </svg>
+            firecracker-farm
+          </div>
+          <p class="hero-tagline">
+            Create, start, stop, and SSH into hardware-isolated microVMs with simple shell commands.
+            Persistent disks. DHCP networking. Systemd lifecycle. On your Linux KVM host.
+          </p>
+          <p class="hero-lede">
+            A shell-first control plane for operators who want Firecracker speed, KVM isolation, and LAN-native guests without adopting a heavyweight virtualization stack.
+          </p>
+          <div class="hero-actions">
+            <a href="#quickstart" class="btn btn-primary">Get Started</a>
+            <a href="https://github.com/linuxdevel/firecracker-farm" class="btn btn-secondary">
+              <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              GitHub
+            </a>
+            <a href="preview.html" class="btn btn-secondary">Compare Visual Directions</a>
+          </div>
+          <div class="hero-install">
+            <span>$</span> curl -fsSL https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/install.sh | sudo bash
+          </div>
+        </div>
 
-        <rect x="440" y="20" width="100" height="60" rx="6" fill="#d29922" opacity="0.1" stroke="#d29922" stroke-width="1.5"/>
-        <text x="490" y="45" text-anchor="middle" fill="#d29922" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-db01</text>
-        <text x="490" y="62" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="9">2 vCPU · 8G</text>
-
-        <!-- KVM labels -->
-        <text x="110" y="100" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">KVM</text>
-        <text x="300" y="100" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">KVM</text>
-        <text x="490" y="100" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="9">KVM</text>
-
-        <!-- Tap lines -->
-        <line x1="110" y1="80" x2="110" y2="130" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <line x1="300" y1="80" x2="300" y2="130" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <line x1="490" y1="80" x2="490" y2="130" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4 3"/>
-
-        <!-- Bridge -->
-        <rect x="40" y="130" width="520" height="30" rx="4" fill="#3fb950" opacity="0.08" stroke="#3fb950" stroke-width="1.5"/>
-        <text x="300" y="150" text-anchor="middle" fill="#3fb950" font-family="Inter,sans-serif" font-size="12" font-weight="600">vmbr0</text>
-
-        <!-- LAN -->
-        <line x1="300" y1="160" x2="300" y2="185" stroke="#30363d" stroke-width="1.5"/>
-        <text x="300" y="198" text-anchor="middle" fill="#8b949e" font-family="Inter,sans-serif" font-size="11">LAN · DHCP</text>
-      </svg>
+        <div>
+          <div class="hero-graphic">
+            <svg width="600" height="200" viewBox="0 0 600 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="60" y="20" width="100" height="60" rx="6" fill="#79c6ff" opacity="0.1" stroke="#79c6ff" stroke-width="1.5"/>
+              <text x="110" y="45" text-anchor="middle" fill="#79c6ff" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-web01</text>
+              <text x="110" y="62" text-anchor="middle" fill="#9fb0cb" font-family="Inter,sans-serif" font-size="9">2 vCPU · 2G</text>
+              <rect x="250" y="20" width="100" height="60" rx="6" fill="#79f0bb" opacity="0.1" stroke="#79f0bb" stroke-width="1.5"/>
+              <text x="300" y="45" text-anchor="middle" fill="#79f0bb" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-app01</text>
+              <text x="300" y="62" text-anchor="middle" fill="#9fb0cb" font-family="Inter,sans-serif" font-size="9">4 vCPU · 4G</text>
+              <rect x="440" y="20" width="100" height="60" rx="6" fill="#ffd37a" opacity="0.1" stroke="#ffd37a" stroke-width="1.5"/>
+              <text x="490" y="45" text-anchor="middle" fill="#ffd37a" font-family="Inter,sans-serif" font-size="11" font-weight="600">fc-db01</text>
+              <text x="490" y="62" text-anchor="middle" fill="#9fb0cb" font-family="Inter,sans-serif" font-size="9">2 vCPU · 8G</text>
+              <text x="110" y="100" text-anchor="middle" fill="#9fb0cb" font-family="monospace" font-size="9">KVM</text>
+              <text x="300" y="100" text-anchor="middle" fill="#9fb0cb" font-family="monospace" font-size="9">KVM</text>
+              <text x="490" y="100" text-anchor="middle" fill="#9fb0cb" font-family="monospace" font-size="9">KVM</text>
+              <line x1="110" y1="80" x2="110" y2="130" stroke="#31415f" stroke-width="1.5" stroke-dasharray="4 3"/>
+              <line x1="300" y1="80" x2="300" y2="130" stroke="#31415f" stroke-width="1.5" stroke-dasharray="4 3"/>
+              <line x1="490" y1="80" x2="490" y2="130" stroke="#31415f" stroke-width="1.5" stroke-dasharray="4 3"/>
+              <rect x="40" y="130" width="520" height="30" rx="4" fill="#79f0bb" opacity="0.08" stroke="#79f0bb" stroke-width="1.5"/>
+              <text x="300" y="150" text-anchor="middle" fill="#79f0bb" font-family="Inter,sans-serif" font-size="12" font-weight="600">vmbr0</text>
+              <line x1="300" y1="160" x2="300" y2="185" stroke="#31415f" stroke-width="1.5"/>
+              <text x="300" y="198" text-anchor="middle" fill="#9fb0cb" font-family="Inter,sans-serif" font-size="11">LAN · DHCP</text>
+            </svg>
+          </div>
+          <div class="hero-proof">
+            <div class="proof-card">
+              <strong>Fast provisioning</strong>
+              <span>Clone from an Ubuntu cloud template and boot in seconds.</span>
+            </div>
+            <div class="proof-card">
+              <strong>Operator friendly</strong>
+              <span>Simple `fc-*` commands for create, lifecycle, status, and SSH.</span>
+            </div>
+            <div class="proof-card">
+              <strong>Host aligned</strong>
+              <span>Uses your existing Linux bridge and systemd primitives.</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -360,7 +409,7 @@
       </div>
       <div class="benefit">
         <svg class="benefit-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        <p><strong>No container escapes</strong> &mdash; Even malicious code cannot cross the KVM hardware boundary.</p>
+        <p><strong>Reduced blast radius</strong> &mdash; Malicious or compromised workloads stay behind a dedicated guest kernel and KVM boundary instead of sharing the host kernel.</p>
       </div>
       <div class="benefit">
         <svg class="benefit-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -434,7 +483,7 @@
 <section id="quickstart">
   <div class="container">
     <h2 class="section-title">Quick Start</h2>
-    <p class="section-subtitle">From zero to a running microVM in four steps.</p>
+    <p class="section-subtitle">From zero to a running microVM in five steps.</p>
 
     <div class="quickstart-steps">
       <div class="quickstart-step">

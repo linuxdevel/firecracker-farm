@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>firecracker-farm Design Preview</title>
+  <meta name="description" content="Homepage comparison surface for the firecracker-farm GitHub Pages redesign.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="#top" aria-label="firecracker-farm preview home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="8" width="40" height="32" rx="4" stroke="#79c6ff" stroke-width="2" fill="none"/>
+            <rect x="10" y="14" width="10" height="10" rx="2" fill="#79c6ff" opacity="0.3"/>
+            <rect x="24" y="14" width="10" height="10" rx="2" fill="#79f0bb" opacity="0.28"/>
+            <rect x="17" y="28" width="10" height="10" rx="2" fill="#ffd37a" opacity="0.28"/>
+          </svg>
+        </span>
+        <span>firecracker-farm preview</span>
+      </a>
+      <nav class="site-nav" aria-label="Preview navigation">
+        <a href="#features">Features</a>
+        <a href="#security">Security</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#openclaw">OpenClaw</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="trust-strip">
+    <div class="container">
+      <div class="trust-pill"><span class="trust-dot" aria-hidden="true"></span><strong>KVM isolated</strong></div>
+      <div class="trust-pill"><span class="trust-dot" aria-hidden="true"></span><strong>Persistent rootfs</strong></div>
+      <div class="trust-pill"><span class="trust-dot" aria-hidden="true"></span><strong>LAN bridged</strong></div>
+      <div class="trust-pill"><span class="trust-dot" aria-hidden="true"></span><strong>systemd managed</strong></div>
+    </div>
+  </div>
+
+  <main class="preview-page">
+    <div class="container">
+      <div class="preview-shell">
+        <div class="preview-header">
+          <div>
+            <div class="section-kicker">Homepage Direction Review</div>
+            <h1>Compare the same homepage structure across all three visual directions.</h1>
+            <p>The content skeleton below mirrors the production homepage sections so you can compare actual landing-page behavior, not just descriptive summaries.</p>
+          </div>
+          <div class="variant-switcher" aria-label="Preview variants">
+            <button class="variant-button" type="button" data-variant-target="refined" aria-pressed="true">Refined Product</button>
+            <button class="variant-button" type="button" data-variant-target="console" aria-pressed="false">Console Product</button>
+            <button class="variant-button" type="button" data-variant-target="editorial" aria-pressed="false">Editorial Product</button>
+          </div>
+        </div>
+
+        <div class="preview-site" data-variant="refined" id="preview-site">
+          <section class="hero preview-home-hero" id="top">
+            <div class="preview-home-shell">
+              <div class="hero-layout">
+                <div>
+                  <div class="eyebrow" id="variant-eyebrow">Refined Product</div>
+                  <div class="hero-logo">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="4" y="8" width="40" height="32" rx="4" stroke="#79c6ff" stroke-width="2" fill="none"/>
+                      <rect x="10" y="14" width="10" height="10" rx="2" fill="#79c6ff" opacity="0.3"/>
+                      <rect x="24" y="14" width="10" height="10" rx="2" fill="#79f0bb" opacity="0.3"/>
+                      <rect x="17" y="28" width="10" height="10" rx="2" fill="#ffd37a" opacity="0.3"/>
+                    </svg>
+                    firecracker-farm
+                  </div>
+                  <p class="hero-tagline" id="variant-summary">Premium operator tooling with measured polish, a technical palette, and product-site clarity.</p>
+                  <p class="hero-lede">Create, start, stop, and SSH into hardware-isolated microVMs with simple shell commands. Persistent disks. DHCP networking. Systemd lifecycle. On your Linux KVM host.</p>
+                  <div class="hero-actions">
+                    <a href="#quickstart" class="btn btn-primary">Review Quickstart</a>
+                    <a href="#security" class="btn btn-secondary">See Isolation Model</a>
+                  </div>
+                  <div class="hero-install">
+                    <span>$</span> curl -fsSL https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/install.sh | sudo bash
+                  </div>
+                </div>
+
+                <div>
+                  <div class="hero-proof">
+                    <div class="proof-card">
+                      <strong id="proof-one-title">Trust-led framing</strong>
+                      <span id="proof-one-copy">Puts runtime guarantees and operability ahead of generic infrastructure slogans.</span>
+                    </div>
+                    <div class="proof-card">
+                      <strong id="proof-two-title">Shared information architecture</strong>
+                      <span id="proof-two-copy">Features, security, architecture, quickstart, OpenClaw, roadmap, and FAQ stay consistent across variants.</span>
+                    </div>
+                    <div class="proof-card">
+                      <strong id="proof-three-title">Real comparison surface</strong>
+                      <span id="proof-three-copy">Switch styles without losing the actual homepage rhythm or section hierarchy.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="features">
+            <div class="preview-section-block surface-panel">
+              <div class="section-kicker">Features</div>
+              <h2 class="section-title">Same product story, different visual treatment.</h2>
+              <p class="section-subtitle">Each direction keeps the same core content blocks so the comparison stays honest to the production homepage structure.</p>
+              <div class="features-grid">
+                <div class="feature-card"><h3>Persistent Disks</h3><p>Per-instance writable rootfs survives stop/start cycles and remains a first-class proof point.</p></div>
+                <div class="feature-card"><h3>DHCP Networking</h3><p>LAN-native guests on the host bridge remain visible as a core operational advantage.</p></div>
+                <div class="feature-card"><h3>Systemd Lifecycle</h3><p>Lifecycle management stays framed as production infrastructure, not just an implementation detail.</p></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="security">
+            <div class="preview-section-block comparison-wrap">
+              <div class="preview-section-head">
+                <div>
+                  <div class="section-kicker">Security</div>
+                  <h2 class="section-title">Firecracker’s isolation argument remains central.</h2>
+                  <p class="comparison-intro" id="security-copy">Refined Product presents the security story as a confident buying case with clear technical proof.</p>
+                </div>
+              </div>
+              <div class="comparison-scroll">
+                <table class="comparison-table">
+                  <thead>
+                    <tr>
+                      <th>Aspect</th>
+                      <th>Docker Container</th>
+                      <th class="highlight highlight-top">Firecracker microVM</th>
+                      <th>Traditional VM</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Isolation</strong></td>
+                      <td>Shared kernel</td>
+                      <td class="highlight">Dedicated kernel + KVM boundary</td>
+                      <td>Dedicated kernel + full hypervisor</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Overhead</strong></td>
+                      <td>Very low</td>
+                      <td class="highlight">Low with VM-grade isolation</td>
+                      <td>Heavier footprint</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Networking</strong></td>
+                      <td>Bridge / NAT / overlay</td>
+                      <td class="highlight highlight-bottom">Tap + bridge on the LAN</td>
+                      <td>Bridge / NAT</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="architecture">
+            <div class="preview-section-block arch-container">
+              <svg width="720" height="260" viewBox="0 0 720 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="20" y="16" width="680" height="180" rx="18" stroke="#31415f" stroke-width="2" stroke-dasharray="6 4" fill="none"/>
+                <text x="42" y="42" fill="#9fb0cb" font-family="Inter,sans-serif" font-size="13" font-weight="600">Linux KVM host</text>
+                <rect x="60" y="62" width="160" height="70" rx="12" fill="#79c6ff" opacity="0.1" stroke="#79c6ff" stroke-width="1.5"/>
+                <text x="140" y="88" text-anchor="middle" fill="#79c6ff" font-family="Inter,sans-serif" font-size="12" font-weight="600">firecracker VM</text>
+                <text x="140" y="106" text-anchor="middle" fill="#9fb0cb" font-family="Inter,sans-serif" font-size="10">rootfs.raw + cloud-init</text>
+                <rect x="280" y="62" width="160" height="70" rx="12" fill="#79f0bb" opacity="0.1" stroke="#79f0bb" stroke-width="1.5"/>
+                <text x="360" y="88" text-anchor="middle" fill="#79f0bb" font-family="Inter,sans-serif" font-size="12" font-weight="600">jailer + KVM</text>
+                <text x="360" y="106" text-anchor="middle" fill="#9fb0cb" font-family="Inter,sans-serif" font-size="10">dedicated user + minimal VMM</text>
+                <rect x="500" y="62" width="160" height="70" rx="12" fill="#ffd37a" opacity="0.1" stroke="#ffd37a" stroke-width="1.5"/>
+                <text x="580" y="88" text-anchor="middle" fill="#ffd37a" font-family="Inter,sans-serif" font-size="12" font-weight="600">vmbr0 bridge</text>
+                <text x="580" y="106" text-anchor="middle" fill="#9fb0cb" font-family="Inter,sans-serif" font-size="10">LAN-native DHCP connectivity</text>
+                <line x1="220" y1="97" x2="280" y2="97" stroke="#31415f" stroke-width="1.5"/>
+                <line x1="440" y1="97" x2="500" y2="97" stroke="#31415f" stroke-width="1.5"/>
+                <rect x="240" y="156" width="240" height="28" rx="10" fill="#bda8ff" opacity="0.08" stroke="#bda8ff" stroke-width="1.2"/>
+                <text x="360" y="174" text-anchor="middle" fill="#bda8ff" font-family="Inter,sans-serif" font-size="11" font-weight="600">systemd service lifecycle</text>
+              </svg>
+            </div>
+          </section>
+
+          <section id="quickstart">
+            <div class="preview-section-block surface-panel">
+              <div class="section-kicker">Quickstart</div>
+              <h2 class="section-title">Quickstart stays task-oriented across all directions.</h2>
+              <div class="quickstart-steps">
+                <div class="quickstart-step">
+                  <div class="step-number">1</div>
+                  <div class="step-content">
+                    <h3>Install</h3>
+                    <div class="terminal"><pre><span class="cmd">curl</span> <span class="flag">-fsSL</span> https://raw.githubusercontent.com/linuxdevel/firecracker-farm/main/install.sh | <span class="cmd">sudo bash</span></pre></div>
+                  </div>
+                </div>
+                <div class="quickstart-step">
+                  <div class="step-number">2</div>
+                  <div class="step-content">
+                    <h3>Create and Start</h3>
+                    <div class="terminal"><pre><span class="cmd">fc-create</span> <span class="arg">myvm</span>
+<span class="cmd">fc-start</span> <span class="arg">myvm</span></pre></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="openclaw">
+            <div class="preview-section-block surface-panel">
+              <div class="section-kicker">OpenClaw</div>
+              <h2 class="section-title">The sandbox example remains a shared proof-of-use.</h2>
+              <p class="example-intro" id="openclaw-copy">The same section shows how an AI runtime can move from Docker-style isolation to a Firecracker-backed microVM with a persistent environment.</p>
+              <div class="sandbox-compare">
+                <div class="sandbox-card">
+                  <h4>Container-style sandbox</h4>
+                  <ul>
+                    <li>Shared host kernel</li>
+                    <li>Container escape risk remains host-adjacent</li>
+                    <li>Less aligned with hostile code execution</li>
+                  </ul>
+                </div>
+                <div class="sandbox-card preferred">
+                  <h4>Firecracker sandbox</h4>
+                  <ul>
+                    <li>Dedicated guest kernel</li>
+                    <li>KVM hardware isolation</li>
+                    <li>Persistent microVM environment</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="roadmap">
+            <div class="preview-section-block surface-panel">
+              <div class="section-kicker">Roadmap</div>
+              <h2 class="section-title">Roadmap remains visible without changing the hierarchy.</h2>
+              <div class="features-grid">
+                <div class="feature-card"><h3>Network Isolation</h3><p>Dedicated isolation bridge and tighter routing boundaries.</p></div>
+                <div class="feature-card"><h3>Transparent TLS Proxy</h3><p>Traffic control and inspection for hardened sandbox workflows.</p></div>
+                <div class="feature-card"><h3>Web Management GUI</h3><p>A future management plane for visibility and policy workflows.</p></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="faq">
+            <div class="faq-item">
+              <h3 class="faq-question">Why compare variants on a shared homepage skeleton?</h3>
+              <div class="faq-answer">
+                <p>Because variant decisions are more reliable when the same content hierarchy, section count, and product proof points are held constant.</p>
+                <p id="faq-copy">This lets you judge whether the direction improves credibility and readability without hiding behind a different information architecture.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      var variants = {
+        refined: {
+          label: 'Refined Product',
+          summary: 'Premium operator tooling with measured polish, a technical palette, and product-site clarity.',
+          proofOneTitle: 'Trust-led framing',
+          proofOneCopy: 'Puts runtime guarantees and operability ahead of generic infrastructure slogans.',
+          proofTwoTitle: 'Shared information architecture',
+          proofTwoCopy: 'Features, security, architecture, quickstart, OpenClaw, roadmap, and FAQ stay consistent across variants.',
+          proofThreeTitle: 'Real comparison surface',
+          proofThreeCopy: 'Switch styles without losing the actual homepage rhythm or section hierarchy.',
+          security: 'Refined Product presents the security story as a confident buying case with clear technical proof.',
+          openclaw: 'The same section shows how an AI runtime can move from Docker-style isolation to a Firecracker-backed microVM with a persistent environment.',
+          faq: 'This lets you judge whether the direction improves credibility and readability without hiding behind a different information architecture.'
+        },
+        console: {
+          label: 'Console Product',
+          summary: 'Terminal-first styling that leans into operator workflows and raw infrastructure aesthetics.',
+          proofOneTitle: 'Operator-console voice',
+          proofOneCopy: 'Reads more like a control plane or hardened shell environment than a marketing site.',
+          proofTwoTitle: 'Dense technical signaling',
+          proofTwoCopy: 'Keeps the same sections, but frames them with higher-density runtime and command-line energy.',
+          proofThreeTitle: 'Minimal translation layer',
+          proofThreeCopy: 'Best when you want the homepage to feel directly adjacent to the product itself.',
+          security: 'Console Product makes the security comparison feel like an ops decision: less pitch, more hardened runtime posture.',
+          openclaw: 'The OpenClaw section becomes a workload-isolation demonstration with more emphasis on blast-radius reduction.',
+          faq: 'It highlights whether a more terminal-native aesthetic improves trust for technical operators or narrows the audience too much.'
+        },
+        editorial: {
+          label: 'Editorial Product',
+          summary: 'Narrative-heavy presentation with warmer contrast and a more magazine-like technical story.',
+          proofOneTitle: 'Narrative-first pacing',
+          proofOneCopy: 'Allows the same proof points to breathe with more storytelling and more deliberate section rhythm.',
+          proofTwoTitle: 'Warmer technical tone',
+          proofTwoCopy: 'Softens the product feel while still keeping the operational claims and architecture intact.',
+          proofThreeTitle: 'Thesis-driven presentation',
+          proofThreeCopy: 'Useful when the site should persuade through explanation as much as through product framing.',
+          security: 'Editorial Product treats the security comparison like a guided argument about why microVMs occupy the middle ground.',
+          openclaw: 'The OpenClaw example reads more like a case study about safer AI execution than a feature pitch.',
+          faq: 'It shows whether a calmer, more explanatory voice improves clarity without making the product feel less immediate.'
+        }
+      };
+
+      var previewSite = document.getElementById('preview-site');
+      var buttons = document.querySelectorAll('[data-variant-target]');
+      var fields = {
+        eyebrow: document.getElementById('variant-eyebrow'),
+        summary: document.getElementById('variant-summary'),
+        proofOneTitle: document.getElementById('proof-one-title'),
+        proofOneCopy: document.getElementById('proof-one-copy'),
+        proofTwoTitle: document.getElementById('proof-two-title'),
+        proofTwoCopy: document.getElementById('proof-two-copy'),
+        proofThreeTitle: document.getElementById('proof-three-title'),
+        proofThreeCopy: document.getElementById('proof-three-copy'),
+        security: document.getElementById('security-copy'),
+        openclaw: document.getElementById('openclaw-copy'),
+        faq: document.getElementById('faq-copy')
+      };
+
+      function renderVariant(key) {
+        var variant = variants[key];
+        previewSite.setAttribute('data-variant', key);
+        fields.eyebrow.textContent = variant.label;
+        fields.summary.textContent = variant.summary;
+        fields.proofOneTitle.textContent = variant.proofOneTitle;
+        fields.proofOneCopy.textContent = variant.proofOneCopy;
+        fields.proofTwoTitle.textContent = variant.proofTwoTitle;
+        fields.proofTwoCopy.textContent = variant.proofTwoCopy;
+        fields.proofThreeTitle.textContent = variant.proofThreeTitle;
+        fields.proofThreeCopy.textContent = variant.proofThreeCopy;
+        fields.security.textContent = variant.security;
+        fields.openclaw.textContent = variant.openclaw;
+        fields.faq.textContent = variant.faq;
+
+        buttons.forEach(function (button) {
+          button.setAttribute('aria-pressed', String(button.getAttribute('data-variant-target') === key));
+        });
+      }
+
+      buttons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          renderVariant(button.getAttribute('data-variant-target'));
+        });
+      });
+
+      renderVariant('refined');
+    }());
+  </script>
+</body>
+</html>
