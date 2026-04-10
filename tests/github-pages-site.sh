@@ -10,25 +10,12 @@ fail() {
   exit 1
 }
 
-test_preview_page_exposes_variant_switcher() (
+test_public_preview_artifacts_are_removed() (
   local preview_path
   preview_path="$REPO_ROOT/docs/preview.html"
 
-  [[ -f "$preview_path" ]] || fail "preview page missing"
-  grep -q 'Refined Product' "$preview_path" || fail "preview page missing Refined Product option"
-  grep -q 'Console Product' "$preview_path" || fail "preview page missing Console Product option"
-  grep -q 'Editorial Product' "$preview_path" || fail "preview page missing Editorial Product option"
-  grep -q 'class="site-header"' "$preview_path" || fail "preview page missing shared site header"
-  grep -q 'class="trust-strip"' "$preview_path" || fail "preview page missing shared trust strip"
-  grep -q 'id="features"' "$preview_path" || fail "preview page missing features section"
-  grep -q 'id="security"' "$preview_path" || fail "preview page missing security section"
-  grep -q 'id="architecture"' "$preview_path" || fail "preview page missing architecture section"
-  grep -q 'id="quickstart"' "$preview_path" || fail "preview page missing quickstart section"
-  grep -q 'id="openclaw"' "$preview_path" || fail "preview page missing use case section"
-  grep -q 'id="roadmap"' "$preview_path" || fail "preview page missing roadmap section"
-  grep -q 'id="faq"' "$preview_path" || fail "preview page missing faq section"
-  if grep -q 'role="tablist"' "$preview_path"; then
-    fail "preview page still uses tablist semantics for button group"
+  if [[ -f "$preview_path" ]]; then
+    fail "public preview page still exists in docs output"
   fi
 )
 
@@ -67,11 +54,21 @@ test_homepage_copy_avoids_overclaim_and_counts_steps_correctly() (
   fi
 )
 
+test_live_homepage_stays_single_direction() (
+  local index_path
+  index_path="$REPO_ROOT/docs/index.html"
+
+  if grep -q 'Compare Visual Directions' "$index_path"; then
+    fail "homepage still links to the design comparison flow"
+  fi
+)
+
 main() {
-  test_preview_page_exposes_variant_switcher || return 1
+  test_public_preview_artifacts_are_removed || return 1
   test_homepage_has_sticky_header_navigation || return 1
   test_homepage_surfaces_top_level_trust_strip || return 1
   test_homepage_copy_avoids_overclaim_and_counts_steps_correctly || return 1
+  test_live_homepage_stays_single_direction || return 1
   printf 'PASS: github pages site checks\n'
 }
 
