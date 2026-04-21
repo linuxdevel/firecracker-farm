@@ -146,18 +146,21 @@ fc_network_prepare_instance_metadata() {
 fc_network_resolve_guest_ip_from_neigh() {
     local mac_address=$1
     local bridge_name=$2
+    local prefer_ipv4=${3:-false}
 
     # Collect all IPs for this MAC, prefer IPv4 (contains '.') over
-    # link-local IPv6 (contains ':').
+    # link-local IPv6 (contains ':').  When prefer_ipv4 is "true", only
+    # return an IPv6 address if no IPv4 is available AND a subsequent
+    # active-discovery pass has already been attempted.
     ip neigh show dev "$bridge_name" 2>/dev/null \
-        | awk -v mac="$mac_address" '
+        | awk -v mac="$mac_address" -v pref="$prefer_ipv4" '
             tolower($0) ~ tolower(mac) && /REACHABLE|STALE|DELAY|PROBE/ {
                 if ($1 ~ /\./) { ipv4 = $1 }
                 else if (ipv6 == "") { ipv6 = $1 }
             }
             END {
                 if (ipv4 != "") print ipv4
-                else if (ipv6 != "") print ipv6
+                else if (pref != "true" && ipv6 != "") print ipv6
             }'
 }
 
@@ -185,8 +188,10 @@ fc_network_resolve_guest_ip() {
     local bridge_name=${2:-$FC_DEFAULT_BRIDGE}
     local ip
 
-    # Check ARP/neighbor table for this MAC
-    ip=$(fc_network_resolve_guest_ip_from_neigh "$mac_address" "$bridge_name")
+    # Check ARP/neighbor table for this MAC (IPv4 only on first pass — an
+    # IPv6 link-local address is always present and would short-circuit the
+    # active-discovery step that finds the real IPv4 address).
+    ip=$(fc_network_resolve_guest_ip_from_neigh "$mac_address" "$bridge_name" true)
 
     if [[ -n "$ip" ]]; then
         printf '%s\n' "$ip"
@@ -196,22 +201,33 @@ fc_network_resolve_guest_ip() {
     # The host's ARP cache only contains IPs it has communicated with directly.
     # VMs that talk only to the router never appear. Trigger an ARP sweep of the
     # bridge subnet so all connected hosts expose their IP→MAC mapping.
-    #
-    # nmap -PR sends ARP who-has for every IP in the subnet; the kernel handles
-    # the ARP replies and populates the neighbor cache. Fall back to a broadcast
-    # ping if nmap is unavailable (works when guests respond to broadcast ICMP).
     local bridge_cidr
     bridge_cidr=$(ip -4 addr show dev "$bridge_name" 2>/dev/null \
         | awk '/inet / {print $2; exit}')
     if [[ -n "$bridge_cidr" ]]; then
+        # nmap -PR sends ARP who-has for every IP in the subnet. Its raw-socket
+        # approach reliably discovers hosts but does NOT populate the kernel
+        # neighbor cache, so we parse its output directly for the MAC→IP mapping.
         if command -v nmap >/dev/null 2>&1; then
-            nmap -PR -sn -n "$bridge_cidr" >/dev/null 2>&1 || true
-        else
-            local broadcast
-            broadcast=$(fc_network_cidr_broadcast "$bridge_cidr")
-            if [[ -n "$broadcast" ]]; then
-                ping -b -c 3 -i 0.1 -W 1 "$broadcast" >/dev/null 2>&1 || true
+            ip=$(nmap -PR -sn -n "$bridge_cidr" 2>/dev/null \
+                | awk -v mac="$mac_address" '
+                    /Nmap scan report for/ { current_ip = $NF }
+                    /MAC Address:/ {
+                        gsub(/:/, ":", $3)
+                        if (tolower($3) == tolower(mac)) { print current_ip; exit }
+                    }')
+            if [[ -n "$ip" ]]; then
+                printf '%s\n' "$ip"
+                return 0
             fi
+        fi
+
+        # Fallback: broadcast ping goes through the kernel stack and populates
+        # the neighbor cache directly.
+        local broadcast
+        broadcast=$(fc_network_cidr_broadcast "$bridge_cidr")
+        if [[ -n "$broadcast" ]]; then
+            ping -b -c 3 -i 0.1 -W 1 "$broadcast" >/dev/null 2>&1 || true
         fi
         sleep 0.3
         ip=$(fc_network_resolve_guest_ip_from_neigh "$mac_address" "$bridge_name")
