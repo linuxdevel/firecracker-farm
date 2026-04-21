@@ -121,8 +121,8 @@ fc_disk_increase_main() {
 
   fc_info "Resizing disk for VM '$vm_name': ${current_size_raw} -> ${new_size}"
 
-  # Grow the raw file
-  if ! qemu-img resize "$disk_path" "$new_size"; then
+  # Grow the raw file (specify -f raw explicitly to suppress format-probing warning)
+  if ! qemu-img resize -f raw "$disk_path" "$new_size"; then
     fc_error "qemu-img resize failed"
     return 1
   fi
