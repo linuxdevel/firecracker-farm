@@ -237,5 +237,13 @@ fc_network_resolve_guest_ip() {
         fi
     fi
 
+    # Last resort: accept an IPv6 address from the neighbor table if no IPv4
+    # was found after all active-discovery attempts.
+    ip=$(fc_network_resolve_guest_ip_from_neigh "$mac_address" "$bridge_name")
+    if [[ -n "$ip" ]]; then
+        printf '%s\n' "$ip"
+        return 0
+    fi
+
     return 1
 }
