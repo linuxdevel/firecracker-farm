@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+# shellcheck source=../lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+# shellcheck source=../lib/image.sh
+source "$SCRIPT_DIR/../lib/image.sh"
+# shellcheck source=../lib/firecracker.sh
+source "$SCRIPT_DIR/../lib/firecracker.sh"
+fc_load_config
+
+fc_disk_increase_usage() {
+  cat >&2 <<EOF
+Usage: fc-disk-increase <name> <new-size>
+
+Increase the disk size of a stopped Firecracker VM instance.
+
+The VM must be stopped before resizing. The new size must be larger than the
+current disk size. The ext4 filesystem is grown online-safely using resize2fs.
+
+Arguments:
+  <name>       Name of the VM instance.
+  <new-size>   New disk size (e.g. 40G, 30720M). Must be larger than current.
+
+Options:
+  -h, --help   Show this help text.
+
+Examples:
+  fc-disk-increase myvm 40G
+  fc-disk-increase myvm 30720M
+EOF
+}
+
+fc_disk_increase_main() {
+  case "${1:-}" in
+    -h|--help)
+      fc_disk_increase_usage
+      return 0
+      ;;
+    -V|--version)
+      printf 'firecracker-farm %s\n' "$(fc_version)"
+      return 0
+      ;;
+  esac
+
+  fc_require_argument_count "$#" 2 "Usage: fc-disk-increase <name> <new-size>" || return 1
+
+  if ! fc_running_as_root; then
+    fc_reexec_with_sudo "$0" "$@"
+  fi
+
+  local vm_name=$1
+  local new_size=$2
+
+  # Validate VM name format
+  fc_image_validate_vm_name "$vm_name" || return 1
+
+  # Validate new size is parseable
+  local new_size_mib
+  new_size_mib=$(fc_size_to_mib "$new_size") || {
+    fc_error "invalid size '$new_size'; use a value like 40G or 30720M"
+    return 1
+  }
+
+  # Locate instance metadata
+  local metadata_path
+  metadata_path=$(fc_firecracker_vm_metadata_path "$vm_name")
+  if [[ ! -f "$metadata_path" ]]; then
+    fc_error "instance metadata not found for '$vm_name': $metadata_path"
+    return 1
+  fi
+
+  # Check VM is not running
+  local status_line status
+  status_line=$(fc_firecracker_status "$vm_name") || return 1
+  status=$(awk '{print $2}' <<< "$status_line")
+  if [[ "$status" == "running" ]]; then
+    fc_error "VM '$vm_name' is currently running; stop it first with: fc-stop $vm_name"
+    return 1
+  fi
+
+  # Resolve current disk path and size
+  local disk_path current_size_raw current_size_mib
+  disk_path=$(fc_firecracker_env_get "$metadata_path" "ROOTFS_PATH")
+  if [[ ! -f "$disk_path" ]]; then
+    fc_error "rootfs disk not found: $disk_path"
+    return 1
+  fi
+
+  current_size_raw=$(fc_firecracker_env_get "$metadata_path" "DISK_SIZE" 2>/dev/null || true)
+  if [[ -z "$current_size_raw" ]]; then
+    fc_error "could not read DISK_SIZE from instance metadata"
+    return 1
+  fi
+  current_size_mib=$(fc_size_to_mib "$current_size_raw") || {
+    fc_error "could not parse current disk size '$current_size_raw' from metadata"
+    return 1
+  }
+
+  # Refuse shrink or no-op
+  if (( new_size_mib <= current_size_mib )); then
+    fc_error "new size ${new_size} (${new_size_mib} MiB) must be larger than current size ${current_size_raw} (${current_size_mib} MiB)"
+    return 1
+  fi
+
+  # Check host free space for the delta
+  local delta_mib=$(( new_size_mib - current_size_mib ))
+  local disk_dir
+  disk_dir=$(dirname -- "$disk_path")
+  if ! fc_has_free_space_mib "$disk_dir" "$delta_mib"; then
+    fc_error "$disk_dir does not have enough free space for an additional ${delta_mib} MiB"
+    return 1
+  fi
+
+  fc_info "Resizing disk for VM '$vm_name': ${current_size_raw} -> ${new_size}"
+
+  # Grow the raw file
+  if ! qemu-img resize "$disk_path" "$new_size"; then
+    fc_error "qemu-img resize failed"
+    return 1
+  fi
+
+  # Expand the ext4 filesystem to fill the new space
+  fc_info "Expanding ext4 filesystem to fill ${new_size}"
+  if ! resize2fs -f "$disk_path"; then
+    fc_error "resize2fs failed; disk file has been grown but filesystem may not be expanded"
+    return 1
+  fi
+
+  # Update DISK_SIZE in vm.env (in-place sed replacement)
+  if ! sed -i "s|^DISK_SIZE=.*|DISK_SIZE=${new_size}|" "$metadata_path"; then
+    fc_warn "disk resize succeeded but failed to update DISK_SIZE in $metadata_path"
+  fi
+
+  fc_ok "Disk for VM '$vm_name' successfully increased to ${new_size}"
+}
+
+fc_disk_increase_main "$@"
