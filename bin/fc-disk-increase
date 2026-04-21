@@ -127,6 +127,20 @@ fc_disk_increase_main() {
     return 1
   fi
 
+  # Fix any filesystem inconsistencies before resizing — stale superblock
+  # metadata (e.g. from a prior partial resize) causes resize2fs to expand
+  # to the wrong size. e2fsck -fy corrects this unconditionally.
+  fc_info "Running e2fsck to ensure filesystem consistency before resize"
+  local fsck_exit=0
+  e2fsck -fy "$disk_path" || fsck_exit=$?
+  # e2fsck exits non-zero even when it successfully fixed things:
+  #   exit 1 = errors corrected, exit 2 = corrected + reboot suggested
+  # Only exit codes >= 4 indicate uncorrectable errors.
+  if (( fsck_exit >= 4 )); then
+    fc_error "e2fsck reported uncorrectable errors (exit $fsck_exit); aborting resize"
+    return 1
+  fi
+
   # Expand the ext4 filesystem to fill the new space
   fc_info "Expanding ext4 filesystem to fill ${new_size}"
   if ! resize2fs -f "$disk_path"; then
