@@ -71,10 +71,16 @@ fc_disk_increase_main() {
     return 1
   fi
 
-  # Check VM is not running
-  local status_line status
-  status_line=$(fc_firecracker_status "$vm_name") || return 1
-  status=$(awk '{print $2}' <<< "$status_line")
+  # Check VM is not running.
+  # Use fc_firecracker_vm_info (same as fc-status/fc-list) rather than
+  # fc_firecracker_status, which returns non-zero on stale API sockets
+  # (common immediately after fc-stop) and would silently abort here.
+  local vm_info status
+  vm_info=$(fc_firecracker_vm_info "$vm_name") || {
+    fc_error "could not read VM state for '$vm_name'"
+    return 1
+  }
+  status=$(awk -F= '$1=="STATUS"{print $2}' <<< "$vm_info")
   if [[ "$status" == "running" ]]; then
     fc_error "VM '$vm_name' is currently running; stop it first with: fc-stop $vm_name"
     return 1
